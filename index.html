@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 24)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 25)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -236,6 +236,13 @@
   <div id="screen-newevent" class="screen hidden">
     <div class="section-title" id="newevent-title">Neues Event</div>
     <div class="form">
+      <div class="field hidden" id="event-type-field">
+        <label>Was möchtest du erstellen?</label>
+        <div class="chip-group" id="event-type-chips">
+          <div class="chip" data-val="event">Event (als Athlet)</div>
+          <div class="chip" data-val="training">Trainingsstunde (als Trainer)</div>
+        </div>
+      </div>
       <div class="field">
         <label>Sportart</label>
         <select id="ev2-sport"></select>
@@ -255,6 +262,26 @@
       <div class="field">
         <label>Max. Teilnehmer (optional)</label>
         <input type="number" id="ev2-max" min="1" placeholder="z.B. 10 – leer lassen für unbegrenzt">
+      </div>
+      <div class="hidden" id="training-pricing-fields" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="field">
+          <label>Preismodell</label>
+          <select id="ev2-pricing-type">
+            <option value="">Wählen…</option>
+            <option value="Pro Stunde">Pro Stunde</option>
+            <option value="Pro Einheit">Pro Trainingseinheit</option>
+            <option value="Paketpreise">Paketpreise</option>
+            <option value="Auf Anfrage">Auf Anfrage</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Preis (CHF, optional)</label>
+          <input type="number" id="ev2-price" min="0" placeholder="z.B. 80">
+        </div>
+        <div class="field">
+          <label>Zusätzliche Angaben</label>
+          <textarea id="ev2-price-note" rows="2" placeholder="z.B. 10er-Abo CHF 650"></textarea>
+        </div>
       </div>
       <button class="btn-primary" id="event-save-btn">Event erstellen</button>
       <button class="btn-secondary" id="event-cancel-btn">Abbrechen</button>
@@ -945,6 +972,7 @@ function showTab(tab){
 }
 
 let editingEventId = null;
+let newEventType = 'event';
 
 function showNewEventScreen(){
   document.getElementById('screen-discover').classList.add('hidden');
@@ -954,6 +982,30 @@ function showNewEventScreen(){
   document.getElementById('screen-chat').classList.add('hidden');
   document.getElementById('screen-newevent').classList.remove('hidden');
 }
+
+function renderEventTypeChips(){
+  document.querySelectorAll('#event-type-chips .chip').forEach(chip => {
+    chip.classList.toggle('selected', chip.dataset.val === newEventType);
+  });
+}
+function updateTrainingPricingVisibility(){
+  const trainerChoiceVisible = !document.getElementById('event-type-field').classList.contains('hidden');
+  const showPricing = trainerChoiceVisible && newEventType === 'training';
+  document.getElementById('training-pricing-fields').classList.toggle('hidden', !showPricing);
+}
+document.querySelectorAll('#event-type-chips .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    newEventType = chip.dataset.val;
+    renderEventTypeChips();
+    updateTrainingPricingVisibility();
+    if(newEventType === 'training'){
+      // Vorschlag aus dem Trainerprofil übernehmen, falls noch leer
+      if(!document.getElementById('ev2-pricing-type').value) document.getElementById('ev2-pricing-type').value = document.getElementById('trainer-pricing-type').value || '';
+      if(!document.getElementById('ev2-price').value) document.getElementById('ev2-price').value = document.getElementById('trainer-price').value || '';
+      if(!document.getElementById('ev2-price-note').value) document.getElementById('ev2-price-note').value = document.getElementById('trainer-price-note').value || '';
+    }
+  });
+});
 
 function openNewEventForm(){
   editingEventId = null;
@@ -966,6 +1018,14 @@ function openNewEventForm(){
   document.getElementById('ev2-date').value = '';
   document.getElementById('ev2-time').value = '';
   document.getElementById('ev2-max').value = '';
+  document.getElementById('ev2-pricing-type').value = '';
+  document.getElementById('ev2-price').value = '';
+  document.getElementById('ev2-price-note').value = '';
+  newEventType = 'event';
+  const isTrainer = document.getElementById('p-is-trainer').checked;
+  document.getElementById('event-type-field').classList.toggle('hidden', !isTrainer);
+  renderEventTypeChips();
+  updateTrainingPricingVisibility();
   showNewEventScreen();
 }
 
@@ -980,6 +1040,14 @@ function openEditEventForm(ev){
   document.getElementById('ev2-date').value = ev.event_date || '';
   document.getElementById('ev2-time').value = ev.event_time || '';
   document.getElementById('ev2-max').value = ev.max_participants || '';
+  document.getElementById('ev2-pricing-type').value = ev.price_type || '';
+  document.getElementById('ev2-price').value = ev.price || '';
+  document.getElementById('ev2-price-note').value = ev.price_note || '';
+  newEventType = ev.event_type || 'event';
+  const isTrainer = document.getElementById('p-is-trainer').checked;
+  document.getElementById('event-type-field').classList.toggle('hidden', !isTrainer);
+  renderEventTypeChips();
+  updateTrainingPricingVisibility();
   showNewEventScreen();
 }
 
@@ -1075,6 +1143,14 @@ async function loadEvents(){
     }
     const icsBtnHtml = joined ? `<button class="btn-secondary ics-event-btn" data-id="${e.id}" style="width:100%;margin-top:8px;">📅 In Kalender speichern</button>` : '';
 
+    let trainingInfoHtml = '';
+    if(e.event_type === 'training'){
+      let priceText = e.price_type || '';
+      if(e.price) priceText += (priceText ? ': ' : '') + 'CHF ' + e.price;
+      trainingInfoHtml = `<div style="font-size:12px;color:var(--accent);font-weight:700;margin-bottom:6px;">🏋️ Trainingsangebot${priceText ? ' · ' + escapeHtml(priceText) : ''}</div>` +
+        (e.price_note ? `<div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">${escapeHtml(e.price_note)}</div>` : '');
+    }
+
     let creatorAreaHtml = '';
     if(isCreator){
       const names = (participantIdsByEvent[e.id] || []).map(uid => escapeHtml((profileById[uid] && profileById[uid].username) || 'Unbekannt'));
@@ -1094,6 +1170,7 @@ async function loadEvents(){
         <div class="event-sport">${emoji} ${escapeHtml(e.title)}</div>
       </div>
       <div class="event-body">
+        ${trainingInfoHtml}
         <div class="event-loc">📍 ${escapeHtml(e.ort || '—')}</div>
         <div class="event-meta">📅 ${escapeHtml(e.event_date || '')} ${escapeHtml(e.event_time || '')} · ${metaText}</div>
         ${joinAreaHtml}
@@ -1194,13 +1271,18 @@ async function saveEvent(){
   const event_date = document.getElementById('ev2-date').value;
   const event_time = document.getElementById('ev2-time').value.trim() || '18:00';
   const max_participants = parseInt(document.getElementById('ev2-max').value) || null;
+  const trainerChoiceVisible = !document.getElementById('event-type-field').classList.contains('hidden');
+  const event_type = (trainerChoiceVisible && newEventType === 'training') ? 'training' : 'event';
+  const price_type = event_type === 'training' ? document.getElementById('ev2-pricing-type').value : null;
+  const price = event_type === 'training' ? (parseFloat(document.getElementById('ev2-price').value) || null) : null;
+  const price_note = event_type === 'training' ? document.getElementById('ev2-price-note').value.trim() : null;
   if(!event_date){ alert('Bitte ein Datum wählen.'); return; }
   if(editingEventId){
-    const {error} = await sb.from('events').update({title, sportart, ort, event_date, event_time, max_participants}).eq('id', editingEventId);
+    const {error} = await sb.from('events').update({title, sportart, ort, event_date, event_time, max_participants, event_type, price_type, price, price_note}).eq('id', editingEventId);
     if(error){ showSwipeError('Fehler beim Speichern: ' + error.message); return; }
     editingEventId = null;
   } else {
-    const {data, error} = await sb.from('events').insert({creator_id: currentUser.id, title, sportart, ort, event_date, event_time, max_participants}).select().maybeSingle();
+    const {data, error} = await sb.from('events').insert({creator_id: currentUser.id, title, sportart, ort, event_date, event_time, max_participants, event_type, price_type, price, price_note}).select().maybeSingle();
     if(error){ showSwipeError('Fehler beim Erstellen: ' + error.message); return; }
     if(data){
       await sb.from('event_participants').insert({event_id: data.id, user_id: currentUser.id});
@@ -1211,6 +1293,10 @@ async function saveEvent(){
   document.getElementById('ev2-date').value = '';
   document.getElementById('ev2-time').value = '';
   document.getElementById('ev2-max').value = '';
+  document.getElementById('ev2-pricing-type').value = '';
+  document.getElementById('ev2-price').value = '';
+  document.getElementById('ev2-price-note').value = '';
+  newEventType = 'event';
   showTab('events');
 }
 
