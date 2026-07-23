@@ -126,12 +126,14 @@
   .chat-input-bar{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--card);}
   .chat-input-bar input{flex:1;}
   .empty-state{text-align:center;color:var(--muted);padding:50px 24px;font-size:13.5px;}
+  .tab-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--primary);color:#fff;font-size:10px;font-weight:800;min-width:16px;height:16px;border-radius:8px;padding:0 4px;margin-left:4px;vertical-align:top;}
+  .match-badge{background:var(--primary);color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 6px;flex-shrink:0;}
   ::-webkit-scrollbar{display:none;}
 </style>
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 12)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 13)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -145,7 +147,7 @@
 
   <div id="app-tabs" class="app-tabs hidden">
     <div class="app-tab active" id="tab-discover">🔥 Entdecken</div>
-    <div class="app-tab" id="tab-matches">💬 Matches</div>
+    <div class="app-tab" id="tab-matches">💬 Matches<span class="tab-badge hidden" id="matches-badge"></span></div>
     <div class="app-tab" id="tab-profile">👤 Profil</div>
   </div>
 
@@ -455,6 +457,7 @@ async function handleLogout(){
   document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
   stopMessagePolling();
+  stopUnreadPolling();
 }
 
 async function afterLogin(user){
@@ -465,6 +468,7 @@ async function afterLogin(user){
   document.getElementById('profile-email').textContent = user.email;
   await loadProfile();
   showTab('profile');
+  startUnreadPolling();
 }
 
 /* ---------------- Tabs ---------------- */
@@ -593,11 +597,37 @@ function showMatchOverlay(p, matchId){
 /* ---------------- Matches & Chat ---------------- */
 let activeMatch = null;
 let messagePollingInterval = null;
+let unreadPollingInterval = null;
 
 function stopMessagePolling(){
   if(messagePollingInterval){
     clearInterval(messagePollingInterval);
     messagePollingInterval = null;
+  }
+}
+
+async function refreshMatchesBadge(){
+  if(!currentUser) return;
+  const {count, error} = await sb.from('messages').select('id', {count: 'exact', head: true}).eq('read', false).neq('sender_id', currentUser.id);
+  const badge = document.getElementById('matches-badge');
+  if(error || !count){
+    badge.classList.add('hidden');
+    badge.textContent = '';
+    return;
+  }
+  badge.textContent = count > 9 ? '9+' : String(count);
+  badge.classList.remove('hidden');
+}
+
+function startUnreadPolling(){
+  stopUnreadPolling();
+  refreshMatchesBadge();
+  unreadPollingInterval = setInterval(refreshMatchesBadge, 6000);
+}
+function stopUnreadPolling(){
+  if(unreadPollingInterval){
+    clearInterval(unreadPollingInterval);
+    unreadPollingInterval = null;
   }
 }
 
@@ -615,17 +645,23 @@ async function loadMatches(){
   if(profErr){ list.innerHTML = '<div class="empty-state">Fehler beim Laden: ' + profErr.message + '</div>'; return; }
   const profileById = {};
   (otherProfiles || []).forEach(p => profileById[p.id] = p);
-  list.innerHTML = matchRows.map(m => {
+  const unreadCounts = await Promise.all(matchRows.map(m =>
+    sb.from('messages').select('id', {count: 'exact', head: true}).eq('match_id', m.id).eq('read', false).neq('sender_id', currentUser.id)
+      .then(r => r.count || 0)
+  ));
+  list.innerHTML = matchRows.map((m, i) => {
     const otherId = m.user_a === currentUser.id ? m.user_b : m.user_a;
     const p = profileById[otherId] || {username: 'Unbekannt'};
     const sportsList = (p.sportarten || '').split(',').map(s => s.trim()).filter(Boolean);
     const emoji = SPORT_EMOJI[sportsList[0]] || '🏅';
+    const unread = unreadCounts[i];
     return `<div class="match-row" data-match="${m.id}" data-other='${JSON.stringify(p).replace(/'/g, "&#39;")}'>
       <div class="avatar-circle">${emoji}</div>
       <div class="match-info">
         <div class="match-name">${p.username}</div>
         <div class="match-last">${sportsList.join(', ') || 'Sportart unbekannt'}</div>
       </div>
+      ${unread > 0 ? `<div class="match-badge">${unread > 9 ? '9+' : unread}</div>` : ''}
     </div>`;
   }).join('');
   list.querySelectorAll('.match-row').forEach(row => {
@@ -646,8 +682,14 @@ async function openChat(matchId, otherProfile){
   document.getElementById('screen-profile').classList.add('hidden');
   document.getElementById('screen-chat').classList.remove('hidden');
   await loadMessages();
+  await sb.from('messages').update({read: true}).eq('match_id', matchId).eq('read', false).neq('sender_id', currentUser.id);
+  refreshMatchesBadge();
   stopMessagePolling();
-  messagePollingInterval = setInterval(loadMessages, 4000);
+  messagePollingInterval = setInterval(async () => {
+    await loadMessages();
+    await sb.from('messages').update({read: true}).eq('match_id', matchId).eq('read', false).neq('sender_id', currentUser.id);
+    refreshMatchesBadge();
+  }, 4000);
 }
 
 async function loadMessages(){
