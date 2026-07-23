@@ -146,7 +146,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 16)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 17)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -201,6 +201,10 @@
       <div class="row-2">
         <div class="field"><label>Datum</label><input type="date" id="ev2-date"></div>
         <div class="field"><label>Uhrzeit</label><input type="text" id="ev2-time" placeholder="18:00"></div>
+      </div>
+      <div class="field">
+        <label>Max. Teilnehmer (optional)</label>
+        <input type="number" id="ev2-max" min="1" placeholder="z.B. 10 – leer lassen für unbegrenzt">
       </div>
       <button class="btn-primary" id="event-save-btn">Event erstellen</button>
       <button class="btn-secondary" id="event-cancel-btn">Abbrechen</button>
@@ -587,19 +591,44 @@ async function loadEvents(){
     const emoji = SPORT_EMOJI[e.sportart] || '🏅';
     const count = countByEvent[e.id] || 0;
     const joined = !!joinedByEvent[e.id];
+    const max = e.max_participants;
+    let metaText = count + ' Teilnehmer';
+    let full = false;
+    if(max){
+      const remaining = max - count;
+      full = remaining <= 0;
+      metaText += full ? ' · Ausgebucht' : (' · noch ' + remaining + (remaining === 1 ? ' Platz frei' : ' Plätze frei'));
+    }
+    let joinBtnHtml;
+    if(joined){
+      joinBtnHtml = `<button class="join-btn joined" data-event="${e.id}" data-joined="1">✓ Angemeldet</button>`;
+    } else if(full){
+      joinBtnHtml = `<button class="join-btn" disabled style="opacity:.5;cursor:default;">Ausgebucht</button>`;
+    } else {
+      joinBtnHtml = `<button class="join-btn" data-event="${e.id}" data-joined="0">Teilnehmen</button>`;
+    }
+    const icsBtnHtml = joined ? `<button class="btn-secondary ics-event-btn" data-id="${e.id}" style="width:100%;margin-top:8px;">📅 In Kalender speichern</button>` : '';
     return `<div class="event-card">
       <div class="event-top">
         <div class="event-sport">${emoji} ${escapeHtml(e.title)}</div>
       </div>
       <div class="event-body">
         <div class="event-loc">📍 ${escapeHtml(e.ort || '—')}</div>
-        <div class="event-meta">📅 ${escapeHtml(e.event_date || '')} ${escapeHtml(e.event_time || '')} · ${count} Teilnehmer</div>
-        <button class="join-btn ${joined ? 'joined' : ''}" data-event="${e.id}" data-joined="${joined ? '1' : '0'}">${joined ? '✓ Angemeldet' : 'Teilnehmen'}</button>
+        <div class="event-meta">📅 ${escapeHtml(e.event_date || '')} ${escapeHtml(e.event_time || '')} · ${metaText}</div>
+        ${joinBtnHtml}
+        ${icsBtnHtml}
       </div>
     </div>`;
   }).join('');
-  list.querySelectorAll('.join-btn').forEach(btn => {
+  list.querySelectorAll('.join-btn[data-event]').forEach(btn => {
     btn.addEventListener('click', () => toggleJoinEvent(btn.dataset.event, btn.dataset.joined === '1'));
+  });
+  list.querySelectorAll('.ics-event-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const e = events.find(ev => ev.id === btn.dataset.id);
+      if(!e) return;
+      downloadICS({title: e.title, date: e.event_date, time: e.event_time || '18:00', duration: 60, location: e.ort});
+    });
   });
 }
 
@@ -608,6 +637,18 @@ async function toggleJoinEvent(eventId, isJoined){
     const {error} = await sb.from('event_participants').delete().eq('event_id', eventId).eq('user_id', currentUser.id);
     if(error){ showSwipeError('Fehler: ' + error.message); return; }
   } else {
+    // Vor dem Anmelden nochmal prüfen, ob noch ein Platz frei ist (falls in der Zwischenzeit belegt wurde)
+    const {data: ev, error: evErr} = await sb.from('events').select('max_participants').eq('id', eventId).maybeSingle();
+    if(evErr){ showSwipeError('Fehler: ' + evErr.message); return; }
+    if(ev && ev.max_participants){
+      const {count, error: countErr} = await sb.from('event_participants').select('id', {count: 'exact', head: true}).eq('event_id', eventId);
+      if(countErr){ showSwipeError('Fehler: ' + countErr.message); return; }
+      if((count || 0) >= ev.max_participants){
+        showSwipeError('Dieses Event ist leider inzwischen ausgebucht.');
+        loadEvents();
+        return;
+      }
+    }
     const {error} = await sb.from('event_participants').insert({event_id: eventId, user_id: currentUser.id});
     if(error){ showSwipeError('Fehler: ' + error.message); return; }
   }
@@ -620,8 +661,9 @@ async function createEvent(){
   const ort = document.getElementById('ev2-ort').value.trim();
   const event_date = document.getElementById('ev2-date').value;
   const event_time = document.getElementById('ev2-time').value.trim() || '18:00';
+  const max_participants = parseInt(document.getElementById('ev2-max').value) || null;
   if(!event_date){ alert('Bitte ein Datum wählen.'); return; }
-  const {data, error} = await sb.from('events').insert({creator_id: currentUser.id, title, sportart, ort, event_date, event_time}).select().maybeSingle();
+  const {data, error} = await sb.from('events').insert({creator_id: currentUser.id, title, sportart, ort, event_date, event_time, max_participants}).select().maybeSingle();
   if(error){ showSwipeError('Fehler beim Erstellen: ' + error.message); return; }
   if(data){
     await sb.from('event_participants').insert({event_id: data.id, user_id: currentUser.id});
@@ -630,6 +672,7 @@ async function createEvent(){
   document.getElementById('ev2-ort').value = '';
   document.getElementById('ev2-date').value = '';
   document.getElementById('ev2-time').value = '';
+  document.getElementById('ev2-max').value = '';
   showTab('events');
 }
 
