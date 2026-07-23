@@ -139,14 +139,19 @@
   .event-loc{font-size:13px;color:var(--text);margin-bottom:4px;}
   .event-meta{font-size:12px;color:var(--muted);margin-bottom:10px;}
   .join-btn{width:100%;padding:10px;border-radius:12px;border:none;background:#F1F1F4;color:var(--text);font-weight:700;font-size:13px;cursor:pointer;}
-  .join-btn.joined{background:var(--accent);color:#fff;}
+  .join-btn.joined{background:var(--accent);color:#fff;cursor:default;}
+  .cancel-btn{width:100%;margin-top:6px;background:none;border:none;color:var(--primary);font-size:12.5px;font-weight:700;cursor:pointer;padding:4px;}
+  .participant-toggle{display:block;width:100%;text-align:left;background:none;border:none;color:var(--accent);font-size:12.5px;font-weight:700;cursor:pointer;padding:8px 0 0 0;}
+  .participant-list{font-size:12.5px;color:var(--text);padding:6px 0 0 0;line-height:1.4;}
+  .cancel-notice{background:#FFF3CD;border:1px solid #E6C200;color:#6B5900;font-size:11.5px;padding:8px 10px;border-radius:10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .cancel-notice .dismiss-x{cursor:pointer;font-weight:800;flex-shrink:0;}
   .fab{position:absolute;bottom:18px;right:18px;width:52px;height:52px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 8px 20px rgba(255,90,95,.4);cursor:pointer;border:none;z-index:20;}
   ::-webkit-scrollbar{display:none;}
 </style>
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 18)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 19)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -161,7 +166,7 @@
   <div id="app-tabs" class="app-tabs hidden">
     <div class="app-tab active" id="tab-discover">🔥 Entdecken</div>
     <div class="app-tab" id="tab-matches">💬 Matches<span class="tab-badge hidden" id="matches-badge"></span></div>
-    <div class="app-tab" id="tab-events">📅 Events</div>
+    <div class="app-tab" id="tab-events">📅 Events<span class="tab-badge hidden" id="events-badge"></span></div>
     <div class="app-tab" id="tab-profile">👤 Profil</div>
   </div>
 
@@ -509,6 +514,7 @@ async function handleLogout(){
   document.getElementById('screen-auth').classList.remove('hidden');
   document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
+  document.getElementById('events-badge').classList.add('hidden');
   stopMessagePolling();
   stopUnreadPolling();
 }
@@ -591,14 +597,40 @@ async function loadEvents(){
   if(partErr){ list.innerHTML = '<div class="empty-state">Fehler beim Laden: ' + partErr.message + '</div>'; return; }
   const countByEvent = {};
   const joinedByEvent = {};
+  const participantIdsByEvent = {};
   (participants || []).forEach(p => {
     countByEvent[p.event_id] = (countByEvent[p.event_id] || 0) + 1;
     if(p.user_id === currentUser.id) joinedByEvent[p.event_id] = true;
+    if(!participantIdsByEvent[p.event_id]) participantIdsByEvent[p.event_id] = [];
+    participantIdsByEvent[p.event_id].push(p.user_id);
   });
+
+  // Absage-Meldungen für Events, die ich selbst erstellt habe
+  const myEventIds = events.filter(e => e.creator_id === currentUser.id).map(e => e.id);
+  const cancellationsByEvent = {};
+  const cancellerIds = [];
+  if(myEventIds.length > 0){
+    const {data: cancellations} = await sb.from('event_cancellations').select('*').in('event_id', myEventIds).eq('seen', false);
+    (cancellations || []).forEach(c => {
+      if(!cancellationsByEvent[c.event_id]) cancellationsByEvent[c.event_id] = [];
+      cancellationsByEvent[c.event_id].push(c);
+      cancellerIds.push(c.user_id);
+    });
+  }
+
+  // Profile (Benutzernamen) für Teilnehmerliste + Absage-Meldungen nachladen
+  const allNeededIds = Array.from(new Set([].concat(...Object.values(participantIdsByEvent), cancellerIds)));
+  const profileById = {};
+  if(allNeededIds.length > 0){
+    const {data: profiles} = await sb.from('profiles').select('id, username').in('id', allNeededIds);
+    (profiles || []).forEach(p => profileById[p.id] = p);
+  }
+
   list.innerHTML = events.map(e => {
     const emoji = SPORT_EMOJI[e.sportart] || '🏅';
     const count = countByEvent[e.id] || 0;
     const joined = !!joinedByEvent[e.id];
+    const isCreator = e.creator_id === currentUser.id;
     const max = e.max_participants;
     let metaText = count + ' Teilnehmer';
     let full = false;
@@ -607,15 +639,30 @@ async function loadEvents(){
       full = remaining <= 0;
       metaText += full ? ' · Ausgebucht' : (' · noch ' + remaining + (remaining === 1 ? ' Platz frei' : ' Plätze frei'));
     }
-    let joinBtnHtml;
+    let joinAreaHtml;
     if(joined){
-      joinBtnHtml = `<button class="join-btn joined" data-event="${e.id}" data-joined="1">✓ Angemeldet</button>`;
+      joinAreaHtml = `<div class="join-btn joined">✓ Angemeldet</div>
+        <button class="cancel-btn" data-event="${e.id}" data-creator="${e.creator_id}">Absagen</button>`;
     } else if(full){
-      joinBtnHtml = `<button class="join-btn" disabled style="opacity:.5;cursor:default;">Ausgebucht</button>`;
+      joinAreaHtml = `<button class="join-btn" disabled style="opacity:.5;cursor:default;">Ausgebucht</button>`;
     } else {
-      joinBtnHtml = `<button class="join-btn" data-event="${e.id}" data-joined="0">Teilnehmen</button>`;
+      joinAreaHtml = `<button class="join-btn" data-event="${e.id}">Teilnehmen</button>`;
     }
     const icsBtnHtml = joined ? `<button class="btn-secondary ics-event-btn" data-id="${e.id}" style="width:100%;margin-top:8px;">📅 In Kalender speichern</button>` : '';
+
+    let creatorAreaHtml = '';
+    if(isCreator){
+      const names = (participantIdsByEvent[e.id] || []).map(uid => escapeHtml((profileById[uid] && profileById[uid].username) || 'Unbekannt'));
+      const noticesHtml = (cancellationsByEvent[e.id] || []).map(c => {
+        const name = escapeHtml((profileById[c.user_id] && profileById[c.user_id].username) || 'Jemand');
+        return `<div class="cancel-notice"><span>⚠️ ${name} hat die Teilnahme abgesagt.</span><span class="dismiss-x" data-id="${c.id}">✕</span></div>`;
+      }).join('');
+      creatorAreaHtml = `
+        <button class="participant-toggle" data-event="${e.id}">👥 Teilnehmer anzeigen (${names.length})</button>
+        <div class="participant-list hidden" id="participants-${e.id}">${names.length ? names.join(', ') : 'Noch niemand angemeldet.'}</div>
+        ${noticesHtml}`;
+    }
+
     return `<div class="event-card">
       <div class="event-top">
         <div class="event-sport">${emoji} ${escapeHtml(e.title)}</div>
@@ -623,13 +670,18 @@ async function loadEvents(){
       <div class="event-body">
         <div class="event-loc">📍 ${escapeHtml(e.ort || '—')}</div>
         <div class="event-meta">📅 ${escapeHtml(e.event_date || '')} ${escapeHtml(e.event_time || '')} · ${metaText}</div>
-        ${joinBtnHtml}
+        ${joinAreaHtml}
         ${icsBtnHtml}
+        ${creatorAreaHtml}
       </div>
     </div>`;
   }).join('');
+
   list.querySelectorAll('.join-btn[data-event]').forEach(btn => {
-    btn.addEventListener('click', () => toggleJoinEvent(btn.dataset.event, btn.dataset.joined === '1'));
+    btn.addEventListener('click', () => toggleJoinEvent(btn.dataset.event));
+  });
+  list.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => cancelEventRegistration(btn.dataset.event, btn.dataset.creator));
   });
   list.querySelectorAll('.ics-event-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -638,29 +690,68 @@ async function loadEvents(){
       downloadICS({title: e.title, date: e.event_date, time: e.event_time || '18:00', duration: 60, location: e.ort});
     });
   });
+  list.querySelectorAll('.participant-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = document.getElementById('participants-' + btn.dataset.event);
+      if(panel) panel.classList.toggle('hidden');
+    });
+  });
+  list.querySelectorAll('.dismiss-x').forEach(x => {
+    x.addEventListener('click', () => dismissCancellation(x.dataset.id));
+  });
 }
 
-async function toggleJoinEvent(eventId, isJoined){
-  if(isJoined){
-    const {error} = await sb.from('event_participants').delete().eq('event_id', eventId).eq('user_id', currentUser.id);
-    if(error){ showSwipeError('Fehler: ' + error.message); return; }
-  } else {
-    // Vor dem Anmelden nochmal prüfen, ob noch ein Platz frei ist (falls in der Zwischenzeit belegt wurde)
-    const {data: ev, error: evErr} = await sb.from('events').select('max_participants').eq('id', eventId).maybeSingle();
-    if(evErr){ showSwipeError('Fehler: ' + evErr.message); return; }
-    if(ev && ev.max_participants){
-      const {count, error: countErr} = await sb.from('event_participants').select('id', {count: 'exact', head: true}).eq('event_id', eventId);
-      if(countErr){ showSwipeError('Fehler: ' + countErr.message); return; }
-      if((count || 0) >= ev.max_participants){
-        showSwipeError('Dieses Event ist leider inzwischen ausgebucht.');
-        loadEvents();
-        return;
-      }
+async function toggleJoinEvent(eventId){
+  // Vor dem Anmelden prüfen, ob noch ein Platz frei ist (falls in der Zwischenzeit belegt wurde)
+  const {data: ev, error: evErr} = await sb.from('events').select('max_participants').eq('id', eventId).maybeSingle();
+  if(evErr){ showSwipeError('Fehler: ' + evErr.message); return; }
+  if(ev && ev.max_participants){
+    const {count, error: countErr} = await sb.from('event_participants').select('id', {count: 'exact', head: true}).eq('event_id', eventId);
+    if(countErr){ showSwipeError('Fehler: ' + countErr.message); return; }
+    if((count || 0) >= ev.max_participants){
+      showSwipeError('Dieses Event ist leider inzwischen ausgebucht.');
+      loadEvents();
+      return;
     }
-    const {error} = await sb.from('event_participants').insert({event_id: eventId, user_id: currentUser.id});
-    if(error){ showSwipeError('Fehler: ' + error.message); return; }
+  }
+  const {error} = await sb.from('event_participants').insert({event_id: eventId, user_id: currentUser.id});
+  if(error){ showSwipeError('Fehler: ' + error.message); return; }
+  loadEvents();
+}
+
+async function cancelEventRegistration(eventId, creatorId){
+  if(!confirm('Möchtest du deine Anmeldung für dieses Event wirklich zurückziehen?')) return;
+  const {error} = await sb.from('event_participants').delete().eq('event_id', eventId).eq('user_id', currentUser.id);
+  if(error){ showSwipeError('Fehler: ' + error.message); return; }
+  if(creatorId && creatorId !== currentUser.id){
+    await sb.from('event_cancellations').insert({event_id: eventId, user_id: currentUser.id});
   }
   loadEvents();
+  refreshEventsBadge();
+}
+
+async function dismissCancellation(id){
+  await sb.from('event_cancellations').update({seen: true}).eq('id', id);
+  loadEvents();
+  refreshEventsBadge();
+}
+
+async function refreshEventsBadge(){
+  if(!currentUser) return;
+  const badge = document.getElementById('events-badge');
+  const {data: myEvents, error: evErr} = await sb.from('events').select('id').eq('creator_id', currentUser.id);
+  if(evErr || !myEvents || myEvents.length === 0){
+    badge.classList.add('hidden'); badge.textContent = '';
+    return;
+  }
+  const ids = myEvents.map(e => e.id);
+  const {count, error} = await sb.from('event_cancellations').select('id', {count: 'exact', head: true}).in('event_id', ids).eq('seen', false);
+  if(error || !count){
+    badge.classList.add('hidden'); badge.textContent = '';
+    return;
+  }
+  badge.textContent = count > 9 ? '9+' : String(count);
+  badge.classList.remove('hidden');
 }
 
 async function createEvent(){
@@ -816,7 +907,8 @@ async function refreshMatchesBadge(){
 function startUnreadPolling(){
   stopUnreadPolling();
   refreshMatchesBadge();
-  unreadPollingInterval = setInterval(refreshMatchesBadge, 6000);
+  refreshEventsBadge();
+  unreadPollingInterval = setInterval(() => { refreshMatchesBadge(); refreshEventsBadge(); }, 6000);
 }
 function stopUnreadPolling(){
   if(unreadPollingInterval){
