@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2getherfit – Login &amp; Profil (echte Version)</title>
+<script>
+  window.onerror = function(msg, url, line, col, error){
+    var show = function(){
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#B23A3A;color:#fff;padding:12px;font-size:12px;z-index:99999;font-family:monospace;white-space:pre-wrap;';
+      d.textContent = 'JS-FEHLER: ' + msg + '  |  Datei: ' + (url||'').split('/').pop() + '  |  Zeile ' + line + ':' + col;
+      document.body.appendChild(d);
+    };
+    if(document.body) show(); else window.addEventListener('DOMContentLoaded', show);
+    return false;
+  };
+  window.addEventListener('unhandledrejection', function(e){
+    var d = document.createElement('div');
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#B23A3A;color:#fff;padding:12px;font-size:12px;z-index:99999;font-family:monospace;white-space:pre-wrap;';
+    d.textContent = 'PROMISE-FEHLER: ' + (e.reason && e.reason.message ? e.reason.message : e.reason);
+    document.body.appendChild(d);
+  });
+</script>
+<style>
+  :root{
+    --primary:#FF5A5F; --accent:#00C2A8; --bg:#F7F7F9; --card:#FFFFFF;
+    --text:#1F2430; --muted:#8A8F9C; --border:#ECECEF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:#E9EAEE;display:flex;align-items:flex-start;justify-content:center;
+    min-height:100vh;padding:30px 10px;
+  }
+  .page-note{max-width:390px;margin:0 auto 14px auto;text-align:center;color:#555;font-size:13px;}
+  .setup-warning{
+    max-width:390px;margin:0 auto 14px auto;background:#FFF3CD;border:1px solid #E6C200;
+    color:#6B5900;font-size:12.5px;padding:10px 14px;border-radius:10px;
+  }
+  .phone{
+    width:390px;min-height:700px;background:var(--bg);border-radius:44px;border:10px solid #111;
+    box-shadow:0 20px 50px rgba(0,0,0,.35);overflow:hidden;position:relative;
+    display:flex;flex-direction:column;
+  }
+  .notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:120px;height:24px;background:#111;border-radius:14px;z-index:50;}
+  .statusbar{height:40px;flex-shrink:0;}
+  .topbar{padding:10px 18px;display:flex;align-items:center;justify-content:space-between;background:var(--bg);}
+  .logo{font-weight:800;font-size:20px;color:var(--primary);}
+  .logo span{color:var(--accent);}
+  .screen{flex:1;overflow-y:auto;padding-bottom:20px;}
+  .hidden{display:none !important;}
+  .section-title{font-size:20px;font-weight:800;padding:16px 18px 6px 18px;color:var(--text);}
+  .sub{padding:0 18px;font-size:13px;color:var(--muted);margin-bottom:14px;}
+  .form{padding:0 18px;display:flex;flex-direction:column;gap:14px;}
+  .field label{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px;}
+  select,input[type=text],input[type=email],input[type=password],input[type=number],textarea{
+    width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--border);
+    background:var(--card);font-size:14px;color:var(--text);
+  }
+  .row-2{display:flex;gap:10px;}
+  .row-2>*{flex:1;}
+  .btn-primary{background:var(--primary);color:#fff;border:none;padding:13px;border-radius:14px;font-size:14.5px;font-weight:700;cursor:pointer;transition:background .2s;}
+  .btn-primary.signup-mode{background:var(--accent);}
+  .btn-primary:disabled{opacity:.6;cursor:default;}
+  .section-title.signup-mode{color:var(--accent);}
+  .btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border);padding:13px;border-radius:14px;font-size:14.5px;font-weight:700;cursor:pointer;}
+  .btn-link{background:none;border:none;color:var(--primary);font-size:13px;font-weight:700;cursor:pointer;text-align:center;padding:6px;}
+  .msg{font-size:12.5px;padding:10px 12px;border-radius:10px;margin:0 18px;}
+  .msg.error{background:#FFE8E8;color:#B23A3A;}
+  .msg.ok{background:#E6F9F5;color:#0C8A73;}
+  .chip-group{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{padding:8px 14px;border-radius:20px;border:1px solid var(--border);font-size:12.5px;color:var(--text);background:var(--card);cursor:pointer;}
+  .chip.selected{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .profile-header{display:flex;flex-direction:column;align-items:center;padding:16px 18px 10px 18px;}
+  .profile-avatar{width:84px;height:84px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#FF9472);display:flex;align-items:center;justify-content:center;font-size:38px;margin-bottom:8px;}
+  .toggle-row{text-align:center;padding-top:4px;}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:6px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .app-tabs{display:flex;border-bottom:1px solid var(--border);}
+  .app-tab{flex:1;text-align:center;padding:12px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;}
+  .app-tab.active{color:var(--primary);border-bottom:2px solid var(--primary);}
+  .deck{position:relative;height:420px;margin:14px 18px 0 18px;}
+  .card{position:absolute;top:0;left:0;width:100%;height:100%;background:var(--card);border-radius:20px;box-shadow:0 10px 24px rgba(0,0,0,.12);overflow:hidden;display:flex;flex-direction:column;}
+  .card-photo{height:52%;background:linear-gradient(135deg,var(--primary),#FF9472);display:flex;align-items:center;justify-content:center;font-size:64px;position:relative;flex-shrink:0;}
+  .card-badge{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.45);color:#fff;font-size:11px;padding:4px 10px;border-radius:20px;}
+  .card-body{padding:14px 16px;flex:1;display:flex;flex-direction:column;gap:5px;overflow-y:auto;}
+  .card-name{font-size:18px;font-weight:800;color:var(--text);}
+  .card-meta{font-size:12.5px;color:var(--muted);}
+  .card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;}
+  .tag{background:#F1F1F4;color:#555;font-size:11px;padding:4px 9px;border-radius:20px;}
+  .card-bio{font-size:12px;color:#666;margin-top:2px;line-height:1.3;}
+  .deck-actions{display:flex;justify-content:center;gap:20px;margin-top:14px;}
+  .round-btn{width:52px;height:52px;border-radius:50%;background:var(--card);box-shadow:0 6px 14px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;border:none;}
+  .round-btn.pass{color:var(--primary);}
+  .round-btn.like{color:var(--accent);}
+  .round-btn:disabled{opacity:.5;cursor:default;}
+  .empty-deck{text-align:center;color:var(--muted);padding:60px 20px;font-size:13.5px;}
+  .overlay{position:absolute;inset:0;background:rgba(0,0,0,.78);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;color:#fff;text-align:center;padding:30px;}
+  .overlay h1{font-size:26px;color:var(--accent);margin-bottom:12px;}
+  .overlay p{font-size:13.5px;color:#ddd;margin-bottom:20px;}
+  .overlay .btn-primary{width:200px;background:var(--accent);}
+  .dropdown-wrap{position:relative;}
+  .dropdown-toggle{width:100%;text-align:left;padding:11px 12px;border-radius:12px;border:1px solid var(--border);background:var(--card);font-size:14px;color:var(--text);cursor:pointer;}
+  .dropdown-panel{position:absolute;top:calc(100% + 4px);left:0;right:0;max-height:220px;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 20px rgba(0,0,0,.15);z-index:80;padding:6px 0;}
+  .dropdown-item{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:13.5px;cursor:pointer;color:var(--text);}
+  .dropdown-item:hover{background:#F7F7F9;}
+  .dropdown-item.disabled{opacity:.4;cursor:default;}
+  .sport-chip{display:inline-flex;align-items:center;gap:6px;}
+  .sport-chip .remove-x{font-weight:800;cursor:pointer;}
+  .skill-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .skill-row:last-child{border-bottom:none;}
+  .skill-row .sport-label{font-size:13px;font-weight:600;color:var(--text);}
+  .skill-row select{width:150px;padding:8px 10px;font-size:12.5px;}
+  ::-webkit-scrollbar{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 10)</b></div>
+<div class="setup-warning" id="setup-warning">
+  ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
+</div>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="statusbar"></div>
+  <div class="topbar">
+    <div class="logo">2gether<span>fit</span></div>
+    <div id="topbar-logout" class="hidden" style="font-size:13px;color:var(--muted);cursor:pointer;">Abmelden</div>
+  </div>
+
+  <div id="app-tabs" class="app-tabs hidden">
+    <div class="app-tab active" id="tab-discover">🔥 Entdecken</div>
+    <div class="app-tab" id="tab-profile">👤 Profil</div>
+  </div>
+
+  <!-- ===== DISCOVER / MATCHING SCREEN ===== -->
+  <div id="screen-discover" class="screen hidden">
+    <div class="sub" style="margin:10px 18px 0 18px;">Echte Profile aus der Datenbank – nach Sportart &amp; Skill Level</div>
+    <div class="deck" id="deck"></div>
+    <div class="deck-actions">
+      <button class="round-btn pass" id="btn-pass">✕</button>
+      <button class="round-btn like" id="btn-like">♥</button>
+    </div>
+  </div>
+
+  <!-- ===== AUTH SCREEN (Login / Registrieren) ===== -->
+  <div id="screen-auth" class="screen">
+    <div class="section-title" id="auth-title">🔑 Anmelden</div>
+    <div class="sub" id="auth-sub">Melde dich an, um dein 2getherfit-Profil zu sehen.</div>
+    <div id="auth-msg"></div>
+    <div class="form">
+      <div class="field">
+        <label>E-Mail</label>
+        <input type="email" id="auth-email" placeholder="du@beispiel.ch">
+      </div>
+      <div class="field">
+        <label>Passwort</label>
+        <input type="password" id="auth-password" placeholder="mind. 6 Zeichen">
+      </div>
+      <button class="btn-primary" id="auth-submit">Anmelden</button>
+      <button class="btn-link" id="auth-toggle-btn">Noch kein Konto? Jetzt registrieren</button>
+    </div>
+  </div>
+
+  <!-- ===== PROFIL SCREEN ===== -->
+  <div id="screen-profile" class="screen hidden">
+    <div class="profile-header">
+      <div class="profile-avatar">🙂</div>
+      <div style="font-weight:800;font-size:17px;" id="profile-heading">Dein Profil</div>
+      <div style="font-size:12.5px;color:var(--muted);" id="profile-email"></div>
+    </div>
+    <div id="profile-msg"></div>
+    <div class="form">
+      <div class="field">
+        <label>Benutzername</label>
+        <input type="text" id="p-username" placeholder="Dein Benutzername">
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Geschlecht</label>
+          <select id="p-gender">
+            <option value="">Wählen…</option>
+            <option value="männlich">Männlich</option>
+            <option value="weiblich">Weiblich</option>
+            <option value="divers">Divers</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Alter</label>
+          <input type="number" id="p-age" min="18" placeholder="23">
+        </div>
+      </div>
+      <div class="field">
+        <label>Sportarten (max. 5)</label>
+        <div class="dropdown-wrap">
+          <button type="button" class="dropdown-toggle" id="sports-dropdown-toggle">Sportarten auswählen ▾</button>
+          <div class="dropdown-panel hidden" id="sports-dropdown-panel"></div>
+        </div>
+        <div class="chip-group" id="p-sports-chips" style="margin-top:8px;"></div>
+      </div>
+      <div class="field hidden" id="skill-per-sport-field">
+        <label>Skill Level je Sportart</label>
+        <div id="skill-per-sport-list"></div>
+      </div>
+      <div class="field">
+        <label>Ziele</label>
+        <textarea id="p-goals" rows="2" placeholder="z.B. Halbmarathon, mehr Kraft"></textarea>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <label>Wohnort</label>
+          <input type="text" id="p-city" placeholder="z.B. Olten">
+        </div>
+        <div class="field">
+          <label>Umkreis (km)</label>
+          <input type="number" id="p-radius" min="1" placeholder="30">
+        </div>
+      </div>
+      <button class="btn-primary" id="profile-save-btn">Profil speichern</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+/* =========================================================
+   1) HIER DEINE SUPABASE-ZUGANGSDATEN EINTRAGEN
+   (Projekt-Einstellungen -> API -> Project URL / anon public key)
+   ========================================================= */
+const SUPABASE_URL = "https://adqprhqelhopbodyhkue.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkcXByaHFlbGhvcGJvZHloa3VlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MjYwMTUsImV4cCI6MjEwMDMwMjAxNX0.80E9qb9vTENVLvn9-JoexSFyhRPuk0Ed9H-nc_wpvmQ";
+
+const SPORTS = ["American Football","Badminton","Baseball","Basketball","Biathlon","Billard","Bobfahren","Bogenschiessen","Boxen","Cricket","Crossfit","Curling","Darts","Eishockey","Eiskunstlauf","Fechten","Feldhockey","Fußball","Gewichtheben","Golf","Handball","Judo","Kanu und Kajak","Karate","Klettern","Laufen","Leichtathletik","Motorsport","Mountainbike","Radfahren","Reiten","Rennrodeln","Ringen","Rudern","Rugby","Schwimmen","Segeln","Skifahren","Skilanglauf","Snowboard","Squash","Taekwondo","Tanzen","Tennis","Tischtennis","Triathlon","Turnen","Volleyball","Wandern","Wasserball"];
+const MAX_SPORTS = 5;
+const LEVELS = ["Anfänger","Amateur","Fortgeschritten","Profi","Expert"];
+
+let sb = null;
+let configured = SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY.length > 20;
+const warningEl = document.getElementById('setup-warning');
+
+function loadScriptTag(src){
+  return new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = src;
+    s.crossOrigin = 'anonymous';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Konnte nicht geladen werden: ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function loadSupabaseLibrary(){
+  const sources = [
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+    'https://unpkg.com/@supabase/supabase-js@2'
+  ];
+  const attempts = [];
+  for(const src of sources){
+    try{
+      await loadScriptTag(src);
+      if(typeof window.supabase !== 'undefined'){
+        attempts.push(src + ' -> OK');
+        return {ok:true, log:attempts};
+      }
+      attempts.push(src + ' -> geladen, aber window.supabase fehlt');
+    } catch(e){
+      attempts.push(src + ' -> ' + e.message);
+    }
+  }
+  return {ok:false, log:attempts};
+}
+
+let isSignupMode = false;
+let currentUser = null;
+let selectedSports = [];
+let selectedSkillLevels = {};
+
+/* ---------------- Sportarten-Dropdown ---------------- */
+function renderSportsDropdown(){
+  const panel = document.getElementById('sports-dropdown-panel');
+  const atMax = selectedSports.length >= MAX_SPORTS;
+  panel.innerHTML = SPORTS.map(s => {
+    const checked = selectedSports.includes(s);
+    const disabled = !checked && atMax;
+    return `<div class="dropdown-item ${disabled ? 'disabled' : ''}" data-val="${s}">
+      <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} style="pointer-events:none;">
+      <span>${s}</span>
+    </div>`;
+  }).join('');
+  panel.querySelectorAll('.dropdown-item:not(.disabled)').forEach(item => {
+    item.addEventListener('click', () => {
+      const v = item.dataset.val;
+      if(selectedSports.includes(v)){
+        selectedSports = selectedSports.filter(x => x !== v);
+        delete selectedSkillLevels[v];
+      } else if(selectedSports.length < MAX_SPORTS){
+        selectedSports.push(v);
+      }
+      renderSportsDropdown();
+      renderSportsChips();
+      renderSkillPerSport();
+    });
+  });
+}
+function renderSportsChips(){
+  const el = document.getElementById('p-sports-chips');
+  el.innerHTML = selectedSports.map(s => `<div class="chip selected sport-chip" data-val="${s}">${s} <span class="remove-x" data-remove="${s}">✕</span></div>`).join('');
+  el.querySelectorAll('.remove-x').forEach(x => {
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const v = x.dataset.remove;
+      selectedSports = selectedSports.filter(s => s !== v);
+      delete selectedSkillLevels[v];
+      renderSportsDropdown();
+      renderSportsChips();
+      renderSkillPerSport();
+    });
+  });
+}
+function renderSkillPerSport(){
+  const field = document.getElementById('skill-per-sport-field');
+  const list = document.getElementById('skill-per-sport-list');
+  if(selectedSports.length === 0){
+    field.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  field.classList.remove('hidden');
+  list.innerHTML = selectedSports.map(s => `
+    <div class="skill-row">
+      <span class="sport-label">${s}</span>
+      <select data-sport="${s}">
+        <option value="">Wählen…</option>
+        ${LEVELS.map(l => `<option value="${l}" ${selectedSkillLevels[s]===l?'selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>
+  `).join('');
+  list.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      selectedSkillLevels[sel.dataset.sport] = sel.value;
+    });
+  });
+}
+document.getElementById('sports-dropdown-toggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('sports-dropdown-panel').classList.toggle('hidden');
+});
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('sports-dropdown-panel');
+  const toggle = document.getElementById('sports-dropdown-toggle');
+  if(!panel.contains(e.target) && e.target !== toggle){
+    panel.classList.add('hidden');
+  }
+});
+renderSportsDropdown();
+renderSportsChips();
+renderSkillPerSport();
+
+/* ---------------- Auth UI ---------------- */
+function toggleAuthMode(){
+  isSignupMode = !isSignupMode;
+  document.getElementById('auth-title').textContent = isSignupMode ? '✍️ Registrieren' : '🔑 Anmelden';
+  document.getElementById('auth-sub').textContent = isSignupMode
+    ? 'Erstelle ein neues 2getherfit-Konto.'
+    : 'Melde dich an, um dein 2getherfit-Profil zu sehen.';
+  document.getElementById('auth-submit').textContent = isSignupMode ? 'Registrieren' : 'Anmelden';
+  document.getElementById('auth-toggle-btn').textContent = isSignupMode
+    ? 'Schon ein Konto? Jetzt anmelden'
+    : 'Noch kein Konto? Jetzt registrieren';
+  document.getElementById('auth-msg').innerHTML = '';
+  document.getElementById('auth-submit').classList.toggle('signup-mode', isSignupMode);
+  document.getElementById('auth-title').classList.toggle('signup-mode', isSignupMode);
+}
+function showMsg(containerId, text, type){
+  document.getElementById(containerId).innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+
+async function handleAuthSubmit(){
+  if(!configured || !sb){ showMsg('auth-msg','Supabase ist noch nicht bereit. Bitte Seite neu laden.','error'); return; }
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  if(!email || !password){ showMsg('auth-msg','Bitte E-Mail und Passwort ausfüllen.','error'); return; }
+  const btn = document.getElementById('auth-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Bitte warten…';
+  try{
+    if(isSignupMode){
+      const {data, error} = await sb.auth.signUp({email, password});
+      if(error) throw error;
+      if(data.session){
+        await afterLogin(data.session.user);
+      } else {
+        if(isSignupMode) toggleAuthMode(); // UI zurück auf "Anmelden"
+        showMsg('auth-msg','Konto erstellt! Falls "Confirm email" in Supabase aktiv ist, bitte zuerst den Bestätigungslink in deinem E-Mail-Postfach anklicken, dann hier anmelden.','ok');
+      }
+    } else {
+      const {data, error} = await sb.auth.signInWithPassword({email, password});
+      if(error) throw error;
+      await afterLogin(data.user);
+    }
+  } catch(err){
+    showMsg('auth-msg', 'Fehler: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = isSignupMode ? 'Registrieren' : 'Anmelden';
+  }
+}
+
+async function handleLogout(){
+  await sb.auth.signOut();
+  currentUser = null;
+  document.getElementById('topbar-logout').classList.add('hidden');
+  document.getElementById('app-tabs').classList.add('hidden');
+  document.getElementById('screen-profile').classList.add('hidden');
+  document.getElementById('screen-discover').classList.add('hidden');
+  document.getElementById('screen-auth').classList.remove('hidden');
+  document.getElementById('auth-email').value = '';
+  document.getElementById('auth-password').value = '';
+}
+
+async function afterLogin(user){
+  currentUser = user;
+  document.getElementById('topbar-logout').classList.remove('hidden');
+  document.getElementById('app-tabs').classList.remove('hidden');
+  document.getElementById('screen-auth').classList.add('hidden');
+  document.getElementById('profile-email').textContent = user.email;
+  await loadProfile();
+  showTab('profile');
+}
+
+/* ---------------- Tabs ---------------- */
+function showTab(tab){
+  document.getElementById('screen-discover').classList.toggle('hidden', tab !== 'discover');
+  document.getElementById('screen-profile').classList.toggle('hidden', tab !== 'profile');
+  document.getElementById('tab-discover').classList.toggle('active', tab === 'discover');
+  document.getElementById('tab-profile').classList.toggle('active', tab === 'profile');
+  if(tab === 'discover') loadDiscoverProfiles();
+}
+
+/* ---------------- Discover / Matching ---------------- */
+const SPORT_EMOJI = {"American Football":"🏈","Badminton":"🏸","Baseball":"⚾","Basketball":"🏀","Biathlon":"🎿","Billard":"🎱","Bobfahren":"🛷","Bogenschiessen":"🏹","Boxen":"🥊","Cricket":"🏏","Crossfit":"🏋️","Curling":"🥌","Darts":"🎯","Eishockey":"🏒","Eiskunstlauf":"⛸️","Fechten":"🤺","Feldhockey":"🏑","Fußball":"⚽","Gewichtheben":"🏋️","Golf":"⛳","Handball":"🤾","Judo":"🥋","Kanu und Kajak":"🛶","Karate":"🥋","Klettern":"🧗","Laufen":"🏃","Leichtathletik":"🏃","Motorsport":"🏎️","Mountainbike":"🚵","Radfahren":"🚴","Reiten":"🐎","Rennrodeln":"🛷","Ringen":"🤼","Rudern":"🚣","Rugby":"🏉","Schwimmen":"🏊","Segeln":"⛵","Skifahren":"⛷️","Skilanglauf":"🎿","Snowboard":"🏂","Squash":"🎾","Taekwondo":"🥋","Tanzen":"💃","Tennis":"🎾","Tischtennis":"🏓","Triathlon":"🏊","Turnen":"🤸","Volleyball":"🏐","Wandern":"🥾","Wasserball":"🤽"};
+let discoverProfiles = [];
+let discoverIndex = 0;
+
+async function loadDiscoverProfiles(){
+  const deck = document.getElementById('deck');
+  deck.innerHTML = '<div class="empty-deck">Lade Profile…</div>';
+  document.getElementById('btn-pass').disabled = true;
+  document.getElementById('btn-like').disabled = true;
+  const {data: mySwipes, error: swErr} = await sb.from('swipes').select('swiped_id').eq('swiper_id', currentUser.id);
+  if(swErr){ deck.innerHTML = '<div class="empty-deck">Fehler beim Laden: ' + swErr.message + '</div>'; return; }
+  const excludeIds = new Set((mySwipes || []).map(s => s.swiped_id));
+  excludeIds.add(currentUser.id);
+  const {data: profiles, error} = await sb.from('profiles').select('*');
+  if(error){ deck.innerHTML = '<div class="empty-deck">Fehler beim Laden: ' + error.message + '</div>'; return; }
+  discoverProfiles = (profiles || []).filter(p => !excludeIds.has(p.id) && p.username);
+  discoverIndex = 0;
+  document.getElementById('btn-pass').disabled = false;
+  document.getElementById('btn-like').disabled = false;
+  renderDeck();
+}
+
+function renderDeck(){
+  const deck = document.getElementById('deck');
+  deck.innerHTML = '';
+  if(discoverIndex >= discoverProfiles.length){
+    deck.innerHTML = '<div class="empty-deck">🎉 Keine weiteren Profile gerade.<br>Schau später wieder vorbei, oder lade jemanden ein, sich bei 2getherfit anzumelden!</div>';
+    return;
+  }
+  const p = discoverProfiles[discoverIndex];
+  const sportsList = (p.sportarten || '').split(',').map(s => s.trim()).filter(Boolean);
+  const emoji = SPORT_EMOJI[sportsList[0]] || '🏅';
+  let skillMap = {};
+  try{ skillMap = JSON.parse(p.skill_level || '{}'); } catch(e){ skillMap = {}; }
+  const skillText = sportsList.map(s => skillMap[s] ? (s + ': ' + skillMap[s]) : s).join(' · ');
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="card-photo">${emoji}<div class="card-badge">${p.wohnort || '—'}</div></div>
+    <div class="card-body">
+      <div class="card-name">${p.username}${p.age ? ', ' + p.age : ''}</div>
+      <div class="card-meta">${skillText}</div>
+      <div class="card-tags">${sportsList.map(s => '<span class="tag">' + s + '</span>').join('')}</div>
+      <div class="card-bio">${p.ziele || ''}</div>
+    </div>
+  `;
+  deck.appendChild(card);
+}
+
+async function swipe(liked){
+  if(discoverIndex >= discoverProfiles.length) return;
+  const target = discoverProfiles[discoverIndex];
+  discoverIndex++;
+  renderDeck();
+  const {error} = await sb.from('swipes').insert({swiper_id: currentUser.id, swiped_id: target.id, liked});
+  if(error){ console.warn('Swipe-Fehler:', error.message); return; }
+  if(liked){
+    const {data: reciprocal} = await sb.from('swipes').select('id').eq('swiper_id', target.id).eq('swiped_id', currentUser.id).eq('liked', true).maybeSingle();
+    if(reciprocal){
+      showMatchOverlay(target);
+    }
+  }
+}
+
+function showMatchOverlay(p){
+  const wrap = document.querySelector('.phone');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <h1>It's a Match! 🎉</h1>
+    <p>Du und ${p.username} habt euch beide geliked.</p>
+    <button class="btn-primary" id="overlay-close">Weiter</button>
+  `;
+  wrap.appendChild(overlay);
+  document.getElementById('overlay-close').addEventListener('click', () => overlay.remove());
+}
+
+/* ---------------- Profil laden/speichern ---------------- */
+async function loadProfile(){
+  const {data, error} = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+  if(error){ showMsg('profile-msg', 'Fehler beim Laden: ' + error.message, 'error'); return; }
+  if(data){
+    document.getElementById('p-username').value = data.username || '';
+    document.getElementById('p-gender').value = data.gender || '';
+    document.getElementById('p-age').value = data.age || '';
+    document.getElementById('p-goals').value = data.ziele || '';
+    document.getElementById('p-city').value = data.wohnort || '';
+    document.getElementById('p-radius').value = data.umkreis_km || '';
+    selectedSports = (data.sportarten || '').split(',').map(s=>s.trim()).filter(Boolean).slice(0, MAX_SPORTS);
+    try{
+      selectedSkillLevels = JSON.parse(data.skill_level || '{}');
+    } catch(e){
+      selectedSkillLevels = {};
+    }
+    renderSportsDropdown();
+    renderSportsChips();
+    renderSkillPerSport();
+    document.getElementById('profile-heading').textContent = data.username || 'Dein Profil';
+  } else {
+    document.getElementById('profile-heading').textContent = 'Willkommen! Fülle dein Profil aus';
+  }
+}
+
+async function handleSaveProfile(){
+  const btn = document.getElementById('profile-save-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Speichern…';
+  const payload = {
+    id: currentUser.id,
+    username: document.getElementById('p-username').value.trim(),
+    gender: document.getElementById('p-gender').value,
+    age: parseInt(document.getElementById('p-age').value) || null,
+    sportarten: selectedSports.join(', '),
+    skill_level: JSON.stringify(selectedSkillLevels),
+    ziele: document.getElementById('p-goals').value.trim(),
+    wohnort: document.getElementById('p-city').value.trim(),
+    umkreis_km: parseInt(document.getElementById('p-radius').value) || null,
+  };
+  const {error} = await sb.from('profiles').upsert(payload);
+  btn.disabled = false;
+  btn.textContent = 'Profil speichern';
+  if(error){ showMsg('profile-msg', 'Fehler beim Speichern: ' + error.message, 'error'); return; }
+  showMsg('profile-msg', 'Profil gespeichert ✓', 'ok');
+  document.getElementById('profile-heading').textContent = payload.username || 'Dein Profil';
+}
+
+/* ---------------- Buttons verbinden (statt onclick-Attribute) ---------------- */
+document.getElementById('auth-submit').addEventListener('click', handleAuthSubmit);
+document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthMode);
+document.getElementById('profile-save-btn').addEventListener('click', handleSaveProfile);
+document.getElementById('topbar-logout').addEventListener('click', handleLogout);
+document.getElementById('tab-discover').addEventListener('click', () => showTab('discover'));
+document.getElementById('tab-profile').addEventListener('click', () => showTab('profile'));
+document.getElementById('btn-pass').addEventListener('click', () => swipe(false));
+document.getElementById('btn-like').addEventListener('click', () => swipe(true));
+
+/* ---------------- Beim Start: Bibliothek laden, dann Session prüfen ---------------- */
+(async function init(){
+  if(!configured){
+    document.getElementById('auth-submit').disabled = true;
+    return;
+  }
+  const result = await loadSupabaseLibrary();
+  if(!result.ok){
+    warningEl.innerHTML = '⚠️ Die Supabase-Programmbibliothek konnte von keiner Quelle geladen werden.<br><span style="font-size:11px;">' + result.log.join('<br>') + '</span><br>Bitte Internetverbindung prüfen oder Werbeblocker/Tracking-Schutz für diese Seite ausschalten.';
+    document.getElementById('auth-submit').disabled = true;
+    return;
+  }
+  try{
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    warningEl.classList.add('hidden');
+  } catch(e){
+    warningEl.innerHTML = '⚠️ Fehler beim Verbinden mit Supabase: ' + e.message;
+    document.getElementById('auth-submit').disabled = true;
+    return;
+  }
+  const {data:{session}} = await sb.auth.getSession();
+  if(session){
+    await afterLogin(session.user);
+  }
+})();
+</script>
+</body>
+</html>
