@@ -112,12 +112,26 @@
   .skill-row:last-child{border-bottom:none;}
   .skill-row .sport-label{font-size:13px;font-weight:600;color:var(--text);}
   .skill-row select{width:150px;padding:8px 10px;font-size:12.5px;}
+  .match-row{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .avatar-circle{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#FF9472);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+  .match-info{flex:1;min-width:0;}
+  .match-name{font-weight:700;font-size:14px;color:var(--text);}
+  .match-last{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .chat-header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card);}
+  .chat-header .back{cursor:pointer;font-size:20px;color:var(--text);}
+  .chat-body{padding:14px 16px;display:flex;flex-direction:column;gap:9px;min-height:300px;}
+  .bubble{max-width:75%;padding:9px 13px;border-radius:16px;font-size:13px;line-height:1.35;}
+  .bubble.them{background:var(--card);border:1px solid var(--border);align-self:flex-start;border-bottom-left-radius:4px;}
+  .bubble.me{background:var(--primary);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+  .chat-input-bar{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--border);background:var(--card);}
+  .chat-input-bar input{flex:1;}
+  .empty-state{text-align:center;color:var(--muted);padding:50px 24px;font-size:13.5px;}
   ::-webkit-scrollbar{display:none;}
 </style>
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 10)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 12)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -131,6 +145,7 @@
 
   <div id="app-tabs" class="app-tabs hidden">
     <div class="app-tab active" id="tab-discover">🔥 Entdecken</div>
+    <div class="app-tab" id="tab-matches">💬 Matches</div>
     <div class="app-tab" id="tab-profile">👤 Profil</div>
   </div>
 
@@ -141,6 +156,26 @@
     <div class="deck-actions">
       <button class="round-btn pass" id="btn-pass">✕</button>
       <button class="round-btn like" id="btn-like">♥</button>
+    </div>
+  </div>
+
+  <!-- ===== MATCHES LISTE ===== -->
+  <div id="screen-matches" class="screen hidden">
+    <div class="section-title" style="padding-bottom:8px;">Deine Matches</div>
+    <div id="match-list"></div>
+  </div>
+
+  <!-- ===== CHAT ===== -->
+  <div id="screen-chat" class="screen hidden" style="display:flex;flex-direction:column;">
+    <div class="chat-header">
+      <div class="back" id="chat-back">←</div>
+      <div class="avatar-circle" id="chat-avatar" style="width:38px;height:38px;font-size:16px;"></div>
+      <div class="match-name" id="chat-name"></div>
+    </div>
+    <div class="chat-body" id="chat-body" style="flex:1;overflow-y:auto;"></div>
+    <div class="chat-input-bar">
+      <input type="text" id="chat-input" placeholder="Nachricht schreiben...">
+      <button class="send-btn btn-primary" id="chat-send" style="padding:0 18px;">Senden</button>
     </div>
   </div>
 
@@ -414,9 +449,12 @@ async function handleLogout(){
   document.getElementById('app-tabs').classList.add('hidden');
   document.getElementById('screen-profile').classList.add('hidden');
   document.getElementById('screen-discover').classList.add('hidden');
+  document.getElementById('screen-matches').classList.add('hidden');
+  document.getElementById('screen-chat').classList.add('hidden');
   document.getElementById('screen-auth').classList.remove('hidden');
   document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
+  stopMessagePolling();
 }
 
 async function afterLogin(user){
@@ -432,10 +470,15 @@ async function afterLogin(user){
 /* ---------------- Tabs ---------------- */
 function showTab(tab){
   document.getElementById('screen-discover').classList.toggle('hidden', tab !== 'discover');
+  document.getElementById('screen-matches').classList.toggle('hidden', tab !== 'matches');
   document.getElementById('screen-profile').classList.toggle('hidden', tab !== 'profile');
+  document.getElementById('screen-chat').classList.add('hidden');
   document.getElementById('tab-discover').classList.toggle('active', tab === 'discover');
+  document.getElementById('tab-matches').classList.toggle('active', tab === 'matches');
   document.getElementById('tab-profile').classList.toggle('active', tab === 'profile');
+  stopMessagePolling();
   if(tab === 'discover') loadDiscoverProfiles();
+  if(tab === 'matches') loadMatches();
 }
 
 /* ---------------- Discover / Matching ---------------- */
@@ -488,32 +531,152 @@ function renderDeck(){
   deck.appendChild(card);
 }
 
+function showSwipeError(text){
+  const wrap = document.querySelector('.phone');
+  const el = document.createElement('div');
+  el.style.cssText = 'position:absolute;top:8px;left:8px;right:8px;background:#FFE8E8;color:#B23A3A;font-size:11.5px;padding:8px 10px;border-radius:10px;z-index:300;';
+  el.textContent = text;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 6000);
+}
+
 async function swipe(liked){
   if(discoverIndex >= discoverProfiles.length) return;
   const target = discoverProfiles[discoverIndex];
   discoverIndex++;
   renderDeck();
-  const {error} = await sb.from('swipes').insert({swiper_id: currentUser.id, swiped_id: target.id, liked});
-  if(error){ console.warn('Swipe-Fehler:', error.message); return; }
+  const {error: insertError} = await sb.from('swipes').insert({swiper_id: currentUser.id, swiped_id: target.id, liked});
+  if(insertError){
+    showSwipeError('Fehler beim Speichern des Swipes: ' + insertError.message);
+    return;
+  }
   if(liked){
-    const {data: reciprocal} = await sb.from('swipes').select('id').eq('swiper_id', target.id).eq('swiped_id', currentUser.id).eq('liked', true).maybeSingle();
+    const {data: reciprocal, error: matchError} = await sb.from('swipes').select('id').eq('swiper_id', target.id).eq('swiped_id', currentUser.id).eq('liked', true).maybeSingle();
+    if(matchError){
+      showSwipeError('Fehler bei Match-Prüfung: ' + matchError.message);
+      return;
+    }
     if(reciprocal){
-      showMatchOverlay(target);
+      const [userA, userB] = [currentUser.id, target.id].sort();
+      const {data: matchRow, error: matchInsertError} = await sb.from('matches').insert({user_a: userA, user_b: userB}).select().maybeSingle();
+      if(matchInsertError){
+        showSwipeError('Fehler beim Erstellen des Matches: ' + matchInsertError.message);
+        return;
+      }
+      showMatchOverlay(target, matchRow ? matchRow.id : null);
     }
   }
 }
 
-function showMatchOverlay(p){
+function showMatchOverlay(p, matchId){
   const wrap = document.querySelector('.phone');
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
     <h1>It's a Match! 🎉</h1>
     <p>Du und ${p.username} habt euch beide geliked.</p>
-    <button class="btn-primary" id="overlay-close">Weiter</button>
+    <button class="btn-primary" id="overlay-chat">Chat starten</button>
+    <button class="btn-secondary" id="overlay-close" style="width:200px;margin-top:10px;background:transparent;color:#fff;border-color:#666;">Weiter swipen</button>
   `;
   wrap.appendChild(overlay);
   document.getElementById('overlay-close').addEventListener('click', () => overlay.remove());
+  document.getElementById('overlay-chat').addEventListener('click', () => {
+    overlay.remove();
+    if(matchId){
+      openChat(matchId, p);
+    } else {
+      showTab('matches');
+    }
+  });
+}
+
+/* ---------------- Matches & Chat ---------------- */
+let activeMatch = null;
+let messagePollingInterval = null;
+
+function stopMessagePolling(){
+  if(messagePollingInterval){
+    clearInterval(messagePollingInterval);
+    messagePollingInterval = null;
+  }
+}
+
+async function loadMatches(){
+  const list = document.getElementById('match-list');
+  list.innerHTML = '<div class="empty-state">Lade Matches…</div>';
+  const {data: matchRows, error} = await sb.from('matches').select('*').or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
+  if(error){ list.innerHTML = '<div class="empty-state">Fehler beim Laden: ' + error.message + '</div>'; return; }
+  if(!matchRows || matchRows.length === 0){
+    list.innerHTML = '<div class="empty-state">Noch keine Matches.<br>Geh zu „Entdecken" und finde Trainingspartner!</div>';
+    return;
+  }
+  const otherIds = matchRows.map(m => m.user_a === currentUser.id ? m.user_b : m.user_a);
+  const {data: otherProfiles, error: profErr} = await sb.from('profiles').select('*').in('id', otherIds);
+  if(profErr){ list.innerHTML = '<div class="empty-state">Fehler beim Laden: ' + profErr.message + '</div>'; return; }
+  const profileById = {};
+  (otherProfiles || []).forEach(p => profileById[p.id] = p);
+  list.innerHTML = matchRows.map(m => {
+    const otherId = m.user_a === currentUser.id ? m.user_b : m.user_a;
+    const p = profileById[otherId] || {username: 'Unbekannt'};
+    const sportsList = (p.sportarten || '').split(',').map(s => s.trim()).filter(Boolean);
+    const emoji = SPORT_EMOJI[sportsList[0]] || '🏅';
+    return `<div class="match-row" data-match="${m.id}" data-other='${JSON.stringify(p).replace(/'/g, "&#39;")}'>
+      <div class="avatar-circle">${emoji}</div>
+      <div class="match-info">
+        <div class="match-name">${p.username}</div>
+        <div class="match-last">${sportsList.join(', ') || 'Sportart unbekannt'}</div>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.match-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const other = JSON.parse(row.dataset.other.replace(/&#39;/g, "'"));
+      openChat(row.dataset.match, other);
+    });
+  });
+}
+
+async function openChat(matchId, otherProfile){
+  activeMatch = {id: matchId, other: otherProfile};
+  const sportsList = (otherProfile.sportarten || '').split(',').map(s => s.trim()).filter(Boolean);
+  document.getElementById('chat-avatar').textContent = SPORT_EMOJI[sportsList[0]] || '🏅';
+  document.getElementById('chat-name').textContent = otherProfile.username || 'Unbekannt';
+  document.getElementById('screen-discover').classList.add('hidden');
+  document.getElementById('screen-matches').classList.add('hidden');
+  document.getElementById('screen-profile').classList.add('hidden');
+  document.getElementById('screen-chat').classList.remove('hidden');
+  await loadMessages();
+  stopMessagePolling();
+  messagePollingInterval = setInterval(loadMessages, 4000);
+}
+
+async function loadMessages(){
+  if(!activeMatch) return;
+  const {data, error} = await sb.from('messages').select('*').eq('match_id', activeMatch.id).order('created_at', {ascending: true});
+  if(error){ console.warn('Fehler beim Laden der Nachrichten:', error.message); return; }
+  const body = document.getElementById('chat-body');
+  body.innerHTML = (data || []).map(m => {
+    const mine = m.sender_id === currentUser.id;
+    return `<div class="bubble ${mine ? 'me' : 'them'}">${escapeHtml(m.content)}</div>`;
+  }).join('');
+  body.scrollTop = body.scrollHeight;
+}
+
+function escapeHtml(text){
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+async function sendChatMessage(){
+  if(!activeMatch) return;
+  const input = document.getElementById('chat-input');
+  const content = input.value.trim();
+  if(!content) return;
+  input.value = '';
+  const {error} = await sb.from('messages').insert({match_id: activeMatch.id, sender_id: currentUser.id, content});
+  if(error){ showSwipeError('Fehler beim Senden: ' + error.message); return; }
+  await loadMessages();
 }
 
 /* ---------------- Profil laden/speichern ---------------- */
@@ -571,9 +734,13 @@ document.getElementById('auth-toggle-btn').addEventListener('click', toggleAuthM
 document.getElementById('profile-save-btn').addEventListener('click', handleSaveProfile);
 document.getElementById('topbar-logout').addEventListener('click', handleLogout);
 document.getElementById('tab-discover').addEventListener('click', () => showTab('discover'));
+document.getElementById('tab-matches').addEventListener('click', () => showTab('matches'));
 document.getElementById('tab-profile').addEventListener('click', () => showTab('profile'));
 document.getElementById('btn-pass').addEventListener('click', () => swipe(false));
 document.getElementById('btn-like').addEventListener('click', () => swipe(true));
+document.getElementById('chat-back').addEventListener('click', () => { stopMessagePolling(); showTab('matches'); });
+document.getElementById('chat-send').addEventListener('click', sendChatMessage);
+document.getElementById('chat-input').addEventListener('keydown', (e) => { if(e.key === 'Enter') sendChatMessage(); });
 
 /* ---------------- Beim Start: Bibliothek laden, dann Session prüfen ---------------- */
 (async function init(){
