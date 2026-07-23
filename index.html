@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 23)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 24)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -188,6 +188,10 @@
     <div class="section-title">🔍 Filter</div>
     <div class="form">
       <div class="field">
+        <label>Suche nach</label>
+        <div class="chip-group" id="filter-role-chips"></div>
+      </div>
+      <div class="field">
         <label>Geschlecht</label>
         <div class="chip-group" id="filter-gender-chips"></div>
       </div>
@@ -206,6 +210,15 @@
       <div class="field">
         <label>Skill Level</label>
         <div class="chip-group" id="filter-level-chips"></div>
+      </div>
+      <div class="field">
+        <label>Wohnort</label>
+        <input type="text" id="filter-wohnort" placeholder="z.B. Olten">
+      </div>
+      <div class="field">
+        <label>Umkreis um meinen Standort (km)</label>
+        <input type="number" id="filter-radius-km" min="1" placeholder="z.B. 25">
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">Benötigt die Standortfreigabe in deinem Profil (📍 Standort erfassen).</div>
       </div>
       <button class="btn-primary" id="filter-apply-btn">Filter anwenden</button>
       <button class="btn-secondary" id="filter-reset-btn">Filter zurücksetzen</button>
@@ -341,6 +354,10 @@
           <label>Umkreis (km)</label>
           <input type="number" id="p-radius" min="1" placeholder="30">
         </div>
+      </div>
+      <div class="field">
+        <button type="button" class="btn-secondary" id="capture-location-btn" style="width:100%;">📍 Standort für Umkreis-Suche freigeben</button>
+        <div id="location-status" style="font-size:11.5px;color:var(--muted);margin-top:6px;"></div>
       </div>
       <div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:2px;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:normal;font-size:13.5px;">
@@ -574,9 +591,59 @@ document.getElementById('p-is-trainer').addEventListener('change', (e) => {
 renderTrainerSportsDropdown();
 renderTrainerSportsChips();
 
+/* ---------------- Standort (Geodaten) ---------------- */
+let profileLat = null;
+let profileLng = null;
+
+function getCurrentPosition(){
+  return new Promise((resolve, reject) => {
+    if(!navigator.geolocation){ reject(new Error('Geolocation wird von diesem Browser nicht unterstützt.')); return; }
+    navigator.geolocation.getCurrentPosition(resolve, (err) => reject(new Error(err.message || 'Standort konnte nicht ermittelt werden.')), {timeout: 10000});
+  });
+}
+
+function haversineKm(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+document.getElementById('capture-location-btn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('location-status');
+  statusEl.textContent = 'Standort wird ermittelt…';
+  try{
+    const pos = await getCurrentPosition();
+    profileLat = pos.coords.latitude;
+    profileLng = pos.coords.longitude;
+    statusEl.textContent = 'Standort erfasst ✓ (wird beim Speichern übernommen)';
+  } catch(err){
+    statusEl.textContent = 'Standort konnte nicht erfasst werden: ' + err.message;
+  }
+});
+
 /* ---------------- Filter (Entdecken) ---------------- */
 const GENDERS = [{v:'männlich', label:'Männlich'}, {v:'weiblich', label:'Weiblich'}, {v:'divers', label:'Divers'}];
-let discoverFilters = {genders: [], ageMin: null, ageMax: null, sports: [], levels: []};
+const ROLES = [{v:'trainer', label:'Trainer/in'}, {v:'athlet', label:'Athlet/in'}];
+let discoverFilters = {roles: [], genders: [], ageMin: null, ageMax: null, sports: [], levels: [], wohnort: '', radiusKm: null};
+
+function renderFilterRoleChips(){
+  const el = document.getElementById('filter-role-chips');
+  el.innerHTML = ROLES.map(r => `<div class="chip ${discoverFilters.roles.includes(r.v) ? 'selected' : ''}" data-val="${r.v}">${r.label}</div>`).join('');
+  el.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const v = chip.dataset.val;
+      if(discoverFilters.roles.includes(v)){
+        discoverFilters.roles = discoverFilters.roles.filter(x => x !== v);
+      } else {
+        discoverFilters.roles.push(v);
+      }
+      renderFilterRoleChips();
+    });
+  });
+}
 
 function renderFilterGenderChips(){
   const el = document.getElementById('filter-gender-chips');
@@ -661,7 +728,7 @@ document.addEventListener('click', (e) => {
 
 function updateFilterBadge(){
   const badge = document.getElementById('filter-count-badge');
-  const count = discoverFilters.genders.length + (discoverFilters.ageMin ? 1 : 0) + (discoverFilters.ageMax ? 1 : 0) + discoverFilters.sports.length + discoverFilters.levels.length;
+  const count = discoverFilters.roles.length + discoverFilters.genders.length + (discoverFilters.ageMin ? 1 : 0) + (discoverFilters.ageMax ? 1 : 0) + discoverFilters.sports.length + discoverFilters.levels.length + (discoverFilters.wohnort ? 1 : 0) + (discoverFilters.radiusKm ? 1 : 0);
   if(count > 0){
     badge.textContent = count;
     badge.classList.remove('hidden');
@@ -674,6 +741,9 @@ function updateFilterBadge(){
 function openDiscoverFilter(){
   document.getElementById('filter-age-min').value = discoverFilters.ageMin || '';
   document.getElementById('filter-age-max').value = discoverFilters.ageMax || '';
+  document.getElementById('filter-wohnort').value = discoverFilters.wohnort || '';
+  document.getElementById('filter-radius-km').value = discoverFilters.radiusKm || '';
+  renderFilterRoleChips();
   renderFilterGenderChips();
   renderFilterLevelChips();
   renderFilterSportsDropdown();
@@ -690,15 +760,31 @@ function openDiscoverFilter(){
 function applyDiscoverFilter(){
   discoverFilters.ageMin = parseInt(document.getElementById('filter-age-min').value) || null;
   discoverFilters.ageMax = parseInt(document.getElementById('filter-age-max').value) || null;
+  discoverFilters.wohnort = document.getElementById('filter-wohnort').value.trim();
+  const radiusVal = parseInt(document.getElementById('filter-radius-km').value) || null;
+  if(radiusVal){
+    if(profileLat == null || profileLng == null){
+      showSwipeError('Um nach Umkreis zu filtern, aktiviere zuerst in deinem Profil die Standortfreigabe (📍 Standort erfassen).');
+      discoverFilters.radiusKm = null;
+      document.getElementById('filter-radius-km').value = '';
+    } else {
+      discoverFilters.radiusKm = radiusVal;
+    }
+  } else {
+    discoverFilters.radiusKm = null;
+  }
   document.getElementById('screen-discover-filter').classList.add('hidden');
   updateFilterBadge();
   showTab('discover');
 }
 
 function resetDiscoverFilter(){
-  discoverFilters = {genders: [], ageMin: null, ageMax: null, sports: [], levels: []};
+  discoverFilters = {roles: [], genders: [], ageMin: null, ageMax: null, sports: [], levels: [], wohnort: '', radiusKm: null};
   document.getElementById('filter-age-min').value = '';
   document.getElementById('filter-age-max').value = '';
+  document.getElementById('filter-wohnort').value = '';
+  document.getElementById('filter-radius-km').value = '';
+  renderFilterRoleChips();
   renderFilterGenderChips();
   renderFilterLevelChips();
   renderFilterSportsDropdown();
@@ -708,6 +794,12 @@ function resetDiscoverFilter(){
 
 function matchesDiscoverFilters(p){
   const f = discoverFilters;
+  if(f.roles.length > 0){
+    const isTrainerProfile = !!p.is_trainer;
+    const matchTrainer = f.roles.includes('trainer') && isTrainerProfile;
+    const matchAthlet = f.roles.includes('athlet') && !isTrainerProfile;
+    if(!matchTrainer && !matchAthlet) return false;
+  }
   if(f.genders.length > 0){
     if(!p.gender || !f.genders.includes(p.gender)) return false;
   }
@@ -727,6 +819,14 @@ function matchesDiscoverFilters(p){
     const relevantSports = f.sports.length > 0 ? sportsList.filter(s => f.sports.includes(s)) : sportsList;
     const hasMatch = relevantSports.some(s => f.levels.includes(skillMap[s]));
     if(!hasMatch) return false;
+  }
+  if(f.wohnort){
+    if(!p.wohnort || !p.wohnort.toLowerCase().includes(f.wohnort.toLowerCase())) return false;
+  }
+  if(f.radiusKm && profileLat != null && profileLng != null){
+    if(p.lat == null || p.lng == null) return false;
+    const dist = haversineKm(profileLat, profileLng, p.lat, p.lng);
+    if(dist > f.radiusKm) return false;
   }
   return true;
 }
@@ -807,6 +907,9 @@ async function handleLogout(){
   trainerSelectedSports = [];
   renderTrainerSportsDropdown();
   renderTrainerSportsChips();
+  profileLat = null;
+  profileLng = null;
+  document.getElementById('location-status').textContent = '';
   stopMessagePolling();
   stopUnreadPolling();
 }
@@ -1444,6 +1547,9 @@ async function loadProfile(){
     document.getElementById('p-goals').value = data.ziele || '';
     document.getElementById('p-city').value = data.wohnort || '';
     document.getElementById('p-radius').value = data.umkreis_km || '';
+    profileLat = data.lat != null ? data.lat : null;
+    profileLng = data.lng != null ? data.lng : null;
+    document.getElementById('location-status').textContent = (profileLat != null && profileLng != null) ? 'Standort bereits erfasst ✓' : '';
     selectedSports = (data.sportarten || '').split(',').map(s=>s.trim()).filter(Boolean).slice(0, MAX_SPORTS);
     try{
       selectedSkillLevels = JSON.parse(data.skill_level || '{}');
@@ -1481,6 +1587,8 @@ async function handleSaveProfile(){
     ziele: document.getElementById('p-goals').value.trim(),
     wohnort: document.getElementById('p-city').value.trim(),
     umkreis_km: parseInt(document.getElementById('p-radius').value) || null,
+    lat: profileLat,
+    lng: profileLng,
     is_trainer: document.getElementById('p-is-trainer').checked,
     trainer_sportarten: trainerSelectedSports.join(', '),
     trainer_pricing_type: document.getElementById('trainer-pricing-type').value,
