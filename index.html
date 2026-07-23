@@ -137,7 +137,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 14)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 15)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -472,7 +472,7 @@ async function afterLogin(user){
   document.getElementById('screen-auth').classList.add('hidden');
   document.getElementById('profile-email').textContent = user.email;
   await loadProfile();
-  showTab('profile');
+  showTab('discover');
   startUnreadPolling();
 }
 
