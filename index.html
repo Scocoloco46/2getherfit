@@ -132,12 +132,21 @@
   .bubble.event-bubble{background:#EAF7F5 !important;color:var(--text) !important;border:1px solid var(--accent);}
   .ics-btn{margin-top:6px;background:var(--accent);border:none;color:#fff;font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;cursor:pointer;display:block;}
   .event-form-card{width:100%;max-width:280px;background:var(--card);border-radius:16px;padding:18px;text-align:left;color:var(--text);}
+  .event-card{margin:0 18px 14px 18px;background:var(--card);border-radius:16px;border:1px solid var(--border);overflow:hidden;}
+  .event-top{background:linear-gradient(135deg,var(--accent),#4FD8C3);color:#fff;padding:12px 16px;}
+  .event-sport{font-weight:800;font-size:14px;}
+  .event-body{padding:12px 16px;}
+  .event-loc{font-size:13px;color:var(--text);margin-bottom:4px;}
+  .event-meta{font-size:12px;color:var(--muted);margin-bottom:10px;}
+  .join-btn{width:100%;padding:10px;border-radius:12px;border:none;background:#F1F1F4;color:var(--text);font-weight:700;font-size:13px;cursor:pointer;}
+  .join-btn.joined{background:var(--accent);color:#fff;}
+  .fab{position:absolute;bottom:18px;right:18px;width:52px;height:52px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 8px 20px rgba(255,90,95,.4);cursor:pointer;border:none;z-index:20;}
   ::-webkit-scrollbar{display:none;}
 </style>
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 15)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 16)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -152,6 +161,7 @@
   <div id="app-tabs" class="app-tabs hidden">
     <div class="app-tab active" id="tab-discover">🔥 Entdecken</div>
     <div class="app-tab" id="tab-matches">💬 Matches<span class="tab-badge hidden" id="matches-badge"></span></div>
+    <div class="app-tab" id="tab-events">📅 Events</div>
     <div class="app-tab" id="tab-profile">👤 Profil</div>
   </div>
 
@@ -162,6 +172,38 @@
     <div class="deck-actions">
       <button class="round-btn pass" id="btn-pass">✕</button>
       <button class="round-btn like" id="btn-like">♥</button>
+    </div>
+  </div>
+
+  <!-- ===== EVENTS ===== -->
+  <div id="screen-events" class="screen hidden">
+    <div class="section-title" style="padding-bottom:8px;">📅 Events</div>
+    <div id="event-list"></div>
+    <button class="fab" id="event-fab">+</button>
+  </div>
+
+  <!-- ===== NEUES EVENT ===== -->
+  <div id="screen-newevent" class="screen hidden">
+    <div class="section-title">Neues Event</div>
+    <div class="form">
+      <div class="field">
+        <label>Sportart</label>
+        <select id="ev2-sport"></select>
+      </div>
+      <div class="field">
+        <label>Titel</label>
+        <input type="text" id="ev2-title" placeholder="z.B. Lockeres 8-km-Lauftreffen">
+      </div>
+      <div class="field">
+        <label>Ort</label>
+        <input type="text" id="ev2-ort" placeholder="z.B. Stadtpark Aarau">
+      </div>
+      <div class="row-2">
+        <div class="field"><label>Datum</label><input type="date" id="ev2-date"></div>
+        <div class="field"><label>Uhrzeit</label><input type="text" id="ev2-time" placeholder="18:00"></div>
+      </div>
+      <button class="btn-primary" id="event-save-btn">Event erstellen</button>
+      <button class="btn-secondary" id="event-cancel-btn">Abbrechen</button>
     </div>
   </div>
 
@@ -458,6 +500,8 @@ async function handleLogout(){
   document.getElementById('screen-discover').classList.add('hidden');
   document.getElementById('screen-matches').classList.add('hidden');
   document.getElementById('screen-chat').classList.add('hidden');
+  document.getElementById('screen-events').classList.add('hidden');
+  document.getElementById('screen-newevent').classList.add('hidden');
   document.getElementById('screen-auth').classList.remove('hidden');
   document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
@@ -480,20 +524,114 @@ async function afterLogin(user){
 function showTab(tab){
   document.getElementById('screen-discover').classList.toggle('hidden', tab !== 'discover');
   document.getElementById('screen-matches').classList.toggle('hidden', tab !== 'matches');
+  document.getElementById('screen-events').classList.toggle('hidden', tab !== 'events');
   document.getElementById('screen-profile').classList.toggle('hidden', tab !== 'profile');
   document.getElementById('screen-chat').classList.add('hidden');
+  document.getElementById('screen-newevent').classList.add('hidden');
   document.getElementById('tab-discover').classList.toggle('active', tab === 'discover');
   document.getElementById('tab-matches').classList.toggle('active', tab === 'matches');
+  document.getElementById('tab-events').classList.toggle('active', tab === 'events');
   document.getElementById('tab-profile').classList.toggle('active', tab === 'profile');
   stopMessagePolling();
   if(tab === 'discover') loadDiscoverProfiles();
   if(tab === 'matches') loadMatches();
+  if(tab === 'events') loadEvents();
+}
+
+function openNewEventForm(){
+  fillEventSportSelect();
+  document.getElementById('screen-discover').classList.add('hidden');
+  document.getElementById('screen-matches').classList.add('hidden');
+  document.getElementById('screen-events').classList.add('hidden');
+  document.getElementById('screen-profile').classList.add('hidden');
+  document.getElementById('screen-chat').classList.add('hidden');
+  document.getElementById('screen-newevent').classList.remove('hidden');
 }
 
 /* ---------------- Discover / Matching ---------------- */
 const SPORT_EMOJI = {"American Football":"🏈","Badminton":"🏸","Baseball":"⚾","Basketball":"🏀","Biathlon":"🎿","Billard":"🎱","Bobfahren":"🛷","Bogenschiessen":"🏹","Boxen":"🥊","Cricket":"🏏","Crossfit":"🏋️","Curling":"🥌","Darts":"🎯","Eishockey":"🏒","Eiskunstlauf":"⛸️","Fechten":"🤺","Feldhockey":"🏑","Fußball":"⚽","Gewichtheben":"🏋️","Golf":"⛳","Handball":"🤾","Judo":"🥋","Kanu und Kajak":"🛶","Karate":"🥋","Klettern":"🧗","Laufen":"🏃","Leichtathletik":"🏃","Motorsport":"🏎️","Mountainbike":"🚵","Radfahren":"🚴","Reiten":"🐎","Rennrodeln":"🛷","Ringen":"🤼","Rudern":"🚣","Rugby":"🏉","Schwimmen":"🏊","Segeln":"⛵","Skifahren":"⛷️","Skilanglauf":"🎿","Snowboard":"🏂","Squash":"🎾","Taekwondo":"🥋","Tanzen":"💃","Tennis":"🎾","Tischtennis":"🏓","Triathlon":"🏊","Turnen":"🤸","Volleyball":"🏐","Wandern":"🥾","Wasserball":"🤽"};
 let discoverProfiles = [];
 let discoverIndex = 0;
+
+/* ---------------- Events ---------------- */
+function fillEventSportSelect(){
+  const el = document.getElementById('ev2-sport');
+  if(el.dataset.filled) return;
+  SPORTS.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    el.appendChild(opt);
+  });
+  el.dataset.filled = '1';
+}
+
+async function loadEvents(){
+  const list = document.getElementById('event-list');
+  list.innerHTML = '<div class="empty-state">Lade Events…</div>';
+  const {data: events, error} = await sb.from('events').select('*').order('event_date', {ascending: true});
+  if(error){ list.innerHTML = '<div class="empty-state">Fehler beim Laden: ' + error.message + '</div>'; return; }
+  if(!events || events.length === 0){
+    list.innerHTML = '<div class="empty-state">Noch keine Events.<br>Erstelle das erste über den + Button!</div>';
+    return;
+  }
+  const eventIds = events.map(e => e.id);
+  const {data: participants, error: partErr} = await sb.from('event_participants').select('event_id, user_id').in('event_id', eventIds);
+  if(partErr){ list.innerHTML = '<div class="empty-state">Fehler beim Laden: ' + partErr.message + '</div>'; return; }
+  const countByEvent = {};
+  const joinedByEvent = {};
+  (participants || []).forEach(p => {
+    countByEvent[p.event_id] = (countByEvent[p.event_id] || 0) + 1;
+    if(p.user_id === currentUser.id) joinedByEvent[p.event_id] = true;
+  });
+  list.innerHTML = events.map(e => {
+    const emoji = SPORT_EMOJI[e.sportart] || '🏅';
+    const count = countByEvent[e.id] || 0;
+    const joined = !!joinedByEvent[e.id];
+    return `<div class="event-card">
+      <div class="event-top">
+        <div class="event-sport">${emoji} ${escapeHtml(e.title)}</div>
+      </div>
+      <div class="event-body">
+        <div class="event-loc">📍 ${escapeHtml(e.ort || '—')}</div>
+        <div class="event-meta">📅 ${escapeHtml(e.event_date || '')} ${escapeHtml(e.event_time || '')} · ${count} Teilnehmer</div>
+        <button class="join-btn ${joined ? 'joined' : ''}" data-event="${e.id}" data-joined="${joined ? '1' : '0'}">${joined ? '✓ Angemeldet' : 'Teilnehmen'}</button>
+      </div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.join-btn').forEach(btn => {
+    btn.addEventListener('click', () => toggleJoinEvent(btn.dataset.event, btn.dataset.joined === '1'));
+  });
+}
+
+async function toggleJoinEvent(eventId, isJoined){
+  if(isJoined){
+    const {error} = await sb.from('event_participants').delete().eq('event_id', eventId).eq('user_id', currentUser.id);
+    if(error){ showSwipeError('Fehler: ' + error.message); return; }
+  } else {
+    const {error} = await sb.from('event_participants').insert({event_id: eventId, user_id: currentUser.id});
+    if(error){ showSwipeError('Fehler: ' + error.message); return; }
+  }
+  loadEvents();
+}
+
+async function createEvent(){
+  const sportart = document.getElementById('ev2-sport').value;
+  const title = document.getElementById('ev2-title').value.trim() || 'Gemeinsames Training';
+  const ort = document.getElementById('ev2-ort').value.trim();
+  const event_date = document.getElementById('ev2-date').value;
+  const event_time = document.getElementById('ev2-time').value.trim() || '18:00';
+  if(!event_date){ alert('Bitte ein Datum wählen.'); return; }
+  const {data, error} = await sb.from('events').insert({creator_id: currentUser.id, title, sportart, ort, event_date, event_time}).select().maybeSingle();
+  if(error){ showSwipeError('Fehler beim Erstellen: ' + error.message); return; }
+  if(data){
+    await sb.from('event_participants').insert({event_id: data.id, user_id: currentUser.id});
+  }
+  document.getElementById('ev2-title').value = '';
+  document.getElementById('ev2-ort').value = '';
+  document.getElementById('ev2-date').value = '';
+  document.getElementById('ev2-time').value = '';
+  showTab('events');
+}
 
 async function loadDiscoverProfiles(){
   const deck = document.getElementById('deck');
@@ -872,7 +1010,11 @@ document.getElementById('profile-save-btn').addEventListener('click', handleSave
 document.getElementById('topbar-logout').addEventListener('click', handleLogout);
 document.getElementById('tab-discover').addEventListener('click', () => showTab('discover'));
 document.getElementById('tab-matches').addEventListener('click', () => showTab('matches'));
+document.getElementById('tab-events').addEventListener('click', () => showTab('events'));
 document.getElementById('tab-profile').addEventListener('click', () => showTab('profile'));
+document.getElementById('event-fab').addEventListener('click', openNewEventForm);
+document.getElementById('event-save-btn').addEventListener('click', createEvent);
+document.getElementById('event-cancel-btn').addEventListener('click', () => showTab('events'));
 document.getElementById('btn-pass').addEventListener('click', () => swipe(false));
 document.getElementById('btn-like').addEventListener('click', () => swipe(true));
 document.getElementById('chat-back').addEventListener('click', () => { stopMessagePolling(); showTab('matches'); });
