@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 22)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 23)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -342,6 +342,40 @@
           <input type="number" id="p-radius" min="1" placeholder="30">
         </div>
       </div>
+      <div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:2px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:normal;font-size:13.5px;">
+          <input type="checkbox" id="p-is-trainer" style="width:auto;">
+          Ich biete Trainings als Trainer/in an
+        </label>
+      </div>
+      <div class="hidden" id="trainer-fields" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="field">
+          <label>Sportarten, die du trainierst</label>
+          <div class="dropdown-wrap">
+            <button type="button" class="dropdown-toggle" id="trainer-sports-dropdown-toggle">Sportarten auswählen ▾</button>
+            <div class="dropdown-panel hidden" id="trainer-sports-dropdown-panel"></div>
+          </div>
+          <div class="chip-group" id="trainer-sports-chips" style="margin-top:8px;"></div>
+        </div>
+        <div class="field">
+          <label>Preismodell</label>
+          <select id="trainer-pricing-type">
+            <option value="">Wählen…</option>
+            <option value="Pro Stunde">Pro Stunde</option>
+            <option value="Pro Einheit">Pro Trainingseinheit</option>
+            <option value="Paketpreise">Paketpreise</option>
+            <option value="Auf Anfrage">Auf Anfrage</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Preis (CHF, optional)</label>
+          <input type="number" id="trainer-price" min="0" placeholder="z.B. 80">
+        </div>
+        <div class="field">
+          <label>Zusätzliche Angaben</label>
+          <textarea id="trainer-price-note" rows="2" placeholder="z.B. 10er-Abo CHF 650, Einzellektion 75.–"></textarea>
+        </div>
+      </div>
       <button class="btn-primary" id="profile-save-btn">Profil speichern</button>
     </div>
   </div>
@@ -358,6 +392,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const SPORTS = ["Badminton","Baseball","Basketball","Biathlon","Billard","Boxen","Crossfit","Curling","Darts","Eishockey","Eiskunstlauf","Fitness","Fußball","Golf","Handball","Hockey","Hyrox","Kampfsport","Kanu und Kajak","Klettern","Laufen","Leichtathletik","Motorsport","Mountainbike","Padel","Pilates","Radfahren","Reiten","Rudern","Schwimmen","Skifahren","Skilanglauf","Snowboard","Squash","Tanzen","Tennis","Tischtennis","Triathlon","Turnen","Volleyball","Wandern","Wasserball","Yoga"];
 const MAX_SPORTS = 5;
+const TRAINER_MAX_SPORTS = 8;
 const LEVELS = ["Anfänger","Amateur","Fortgeschritten","Profi","Expert"];
 
 let sb = null;
@@ -481,6 +516,63 @@ document.addEventListener('click', (e) => {
 renderSportsDropdown();
 renderSportsChips();
 renderSkillPerSport();
+
+/* ---------------- Trainerprofil ---------------- */
+let trainerSelectedSports = [];
+
+function renderTrainerSportsDropdown(){
+  const panel = document.getElementById('trainer-sports-dropdown-panel');
+  const atMax = trainerSelectedSports.length >= TRAINER_MAX_SPORTS;
+  panel.innerHTML = SPORTS.map(s => {
+    const checked = trainerSelectedSports.includes(s);
+    const disabled = !checked && atMax;
+    return `<div class="dropdown-item ${disabled ? 'disabled' : ''}" data-val="${s}">
+      <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} style="pointer-events:none;">
+      <span>${s}</span>
+    </div>`;
+  }).join('');
+  panel.querySelectorAll('.dropdown-item:not(.disabled)').forEach(item => {
+    item.addEventListener('click', () => {
+      const v = item.dataset.val;
+      if(trainerSelectedSports.includes(v)){
+        trainerSelectedSports = trainerSelectedSports.filter(x => x !== v);
+      } else if(trainerSelectedSports.length < TRAINER_MAX_SPORTS){
+        trainerSelectedSports.push(v);
+      }
+      renderTrainerSportsDropdown();
+      renderTrainerSportsChips();
+    });
+  });
+}
+function renderTrainerSportsChips(){
+  const el = document.getElementById('trainer-sports-chips');
+  el.innerHTML = trainerSelectedSports.map(s => `<div class="chip selected sport-chip" data-val="${s}">${s} <span class="remove-x" data-remove="${s}">✕</span></div>`).join('');
+  el.querySelectorAll('.remove-x').forEach(x => {
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const v = x.dataset.remove;
+      trainerSelectedSports = trainerSelectedSports.filter(s => s !== v);
+      renderTrainerSportsDropdown();
+      renderTrainerSportsChips();
+    });
+  });
+}
+document.getElementById('trainer-sports-dropdown-toggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('trainer-sports-dropdown-panel').classList.toggle('hidden');
+});
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('trainer-sports-dropdown-panel');
+  const toggle = document.getElementById('trainer-sports-dropdown-toggle');
+  if(!panel.contains(e.target) && e.target !== toggle){
+    panel.classList.add('hidden');
+  }
+});
+document.getElementById('p-is-trainer').addEventListener('change', (e) => {
+  document.getElementById('trainer-fields').classList.toggle('hidden', !e.target.checked);
+});
+renderTrainerSportsDropdown();
+renderTrainerSportsChips();
 
 /* ---------------- Filter (Entdecken) ---------------- */
 const GENDERS = [{v:'männlich', label:'Männlich'}, {v:'weiblich', label:'Weiblich'}, {v:'divers', label:'Divers'}];
@@ -707,6 +799,14 @@ async function handleLogout(){
   document.getElementById('events-badge').classList.add('hidden');
   discoverFilters = {genders: [], ageMin: null, ageMax: null, sports: [], levels: []};
   updateFilterBadge();
+  document.getElementById('p-is-trainer').checked = false;
+  document.getElementById('trainer-fields').classList.add('hidden');
+  document.getElementById('trainer-pricing-type').value = '';
+  document.getElementById('trainer-price').value = '';
+  document.getElementById('trainer-price-note').value = '';
+  trainerSelectedSports = [];
+  renderTrainerSportsDropdown();
+  renderTrainerSportsChips();
   stopMessagePolling();
   stopUnreadPolling();
 }
@@ -1353,6 +1453,14 @@ async function loadProfile(){
     renderSportsDropdown();
     renderSportsChips();
     renderSkillPerSport();
+    document.getElementById('p-is-trainer').checked = !!data.is_trainer;
+    document.getElementById('trainer-fields').classList.toggle('hidden', !data.is_trainer);
+    trainerSelectedSports = (data.trainer_sportarten || '').split(',').map(s=>s.trim()).filter(Boolean).slice(0, TRAINER_MAX_SPORTS);
+    document.getElementById('trainer-pricing-type').value = data.trainer_pricing_type || '';
+    document.getElementById('trainer-price').value = data.trainer_price || '';
+    document.getElementById('trainer-price-note').value = data.trainer_price_note || '';
+    renderTrainerSportsDropdown();
+    renderTrainerSportsChips();
     document.getElementById('profile-heading').textContent = data.username || 'Dein Profil';
   } else {
     document.getElementById('profile-heading').textContent = 'Willkommen! Fülle dein Profil aus';
@@ -1373,6 +1481,11 @@ async function handleSaveProfile(){
     ziele: document.getElementById('p-goals').value.trim(),
     wohnort: document.getElementById('p-city').value.trim(),
     umkreis_km: parseInt(document.getElementById('p-radius').value) || null,
+    is_trainer: document.getElementById('p-is-trainer').checked,
+    trainer_sportarten: trainerSelectedSports.join(', '),
+    trainer_pricing_type: document.getElementById('trainer-pricing-type').value,
+    trainer_price: parseFloat(document.getElementById('trainer-price').value) || null,
+    trainer_price_note: document.getElementById('trainer-price-note').value.trim(),
   };
   const {error} = await sb.from('profiles').upsert(payload);
   btn.disabled = false;
