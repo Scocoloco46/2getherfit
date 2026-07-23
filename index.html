@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 21)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 22)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -356,7 +356,7 @@
 const SUPABASE_URL = "https://adqprhqelhopbodyhkue.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkcXByaHFlbGhvcGJvZHloa3VlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MjYwMTUsImV4cCI6MjEwMDMwMjAxNX0.80E9qb9vTENVLvn9-JoexSFyhRPuk0Ed9H-nc_wpvmQ";
 
-const SPORTS = ["American Football","Badminton","Baseball","Basketball","Biathlon","Billard","Bobfahren","Bogenschiessen","Boxen","Cricket","Crossfit","Curling","Darts","Eishockey","Eiskunstlauf","Fechten","Feldhockey","Fußball","Gewichtheben","Golf","Handball","Judo","Kanu und Kajak","Karate","Klettern","Laufen","Leichtathletik","Motorsport","Mountainbike","Radfahren","Reiten","Rennrodeln","Ringen","Rudern","Rugby","Schwimmen","Segeln","Skifahren","Skilanglauf","Snowboard","Squash","Taekwondo","Tanzen","Tennis","Tischtennis","Triathlon","Turnen","Volleyball","Wandern","Wasserball"];
+const SPORTS = ["Badminton","Baseball","Basketball","Biathlon","Billard","Boxen","Crossfit","Curling","Darts","Eishockey","Eiskunstlauf","Fitness","Fußball","Golf","Handball","Hockey","Hyrox","Kampfsport","Kanu und Kajak","Klettern","Laufen","Leichtathletik","Motorsport","Mountainbike","Padel","Pilates","Radfahren","Reiten","Rudern","Schwimmen","Skifahren","Skilanglauf","Snowboard","Squash","Tanzen","Tennis","Tischtennis","Triathlon","Turnen","Volleyball","Wandern","Wasserball","Yoga"];
 const MAX_SPORTS = 5;
 const LEVELS = ["Anfänger","Amateur","Fortgeschritten","Profi","Expert"];
 
@@ -781,7 +781,7 @@ function openEditEventForm(ev){
 }
 
 /* ---------------- Discover / Matching ---------------- */
-const SPORT_EMOJI = {"American Football":"🏈","Badminton":"🏸","Baseball":"⚾","Basketball":"🏀","Biathlon":"🎿","Billard":"🎱","Bobfahren":"🛷","Bogenschiessen":"🏹","Boxen":"🥊","Cricket":"🏏","Crossfit":"🏋️","Curling":"🥌","Darts":"🎯","Eishockey":"🏒","Eiskunstlauf":"⛸️","Fechten":"🤺","Feldhockey":"🏑","Fußball":"⚽","Gewichtheben":"🏋️","Golf":"⛳","Handball":"🤾","Judo":"🥋","Kanu und Kajak":"🛶","Karate":"🥋","Klettern":"🧗","Laufen":"🏃","Leichtathletik":"🏃","Motorsport":"🏎️","Mountainbike":"🚵","Radfahren":"🚴","Reiten":"🐎","Rennrodeln":"🛷","Ringen":"🤼","Rudern":"🚣","Rugby":"🏉","Schwimmen":"🏊","Segeln":"⛵","Skifahren":"⛷️","Skilanglauf":"🎿","Snowboard":"🏂","Squash":"🎾","Taekwondo":"🥋","Tanzen":"💃","Tennis":"🎾","Tischtennis":"🏓","Triathlon":"🏊","Turnen":"🤸","Volleyball":"🏐","Wandern":"🥾","Wasserball":"🤽"};
+const SPORT_EMOJI = {"Badminton":"🏸","Baseball":"⚾","Basketball":"🏀","Biathlon":"🎿","Billard":"🎱","Boxen":"🥊","Crossfit":"🏋️","Curling":"🥌","Darts":"🎯","Eishockey":"🏒","Eiskunstlauf":"⛸️","Fitness":"💪","Fußball":"⚽","Golf":"⛳","Handball":"🤾","Hockey":"🏑","Hyrox":"🏋️","Kampfsport":"🥋","Kanu und Kajak":"🛶","Klettern":"🧗","Laufen":"🏃","Leichtathletik":"🏃","Motorsport":"🏎️","Mountainbike":"🚵","Padel":"🎾","Pilates":"🧘","Radfahren":"🚴","Reiten":"🐎","Rudern":"🚣","Schwimmen":"🏊","Skifahren":"⛷️","Skilanglauf":"🎿","Snowboard":"🏂","Squash":"🎾","Tanzen":"💃","Tennis":"🎾","Tischtennis":"🏓","Triathlon":"🏊","Turnen":"🤸","Volleyball":"🏐","Wandern":"🥾","Wasserball":"🤽","Yoga":"🧘‍♀️"};
 let discoverProfiles = [];
 let discoverIndex = 0;
 
