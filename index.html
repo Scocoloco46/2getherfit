@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 19)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 21)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -173,10 +173,42 @@
   <!-- ===== DISCOVER / MATCHING SCREEN ===== -->
   <div id="screen-discover" class="screen hidden">
     <div class="sub" style="margin:10px 18px 0 18px;">Echte Profile aus der Datenbank – nach Sportart &amp; Skill Level</div>
+    <div style="padding:0 18px;">
+      <button class="btn-secondary" id="discover-filter-btn" style="width:100%;position:relative;">🔍 Filter<span class="tab-badge hidden" id="filter-count-badge" style="margin-left:6px;"></span></button>
+    </div>
     <div class="deck" id="deck"></div>
     <div class="deck-actions">
       <button class="round-btn pass" id="btn-pass">✕</button>
       <button class="round-btn like" id="btn-like">♥</button>
+    </div>
+  </div>
+
+  <!-- ===== FILTER FÜR ENTDECKEN ===== -->
+  <div id="screen-discover-filter" class="screen hidden">
+    <div class="section-title">🔍 Filter</div>
+    <div class="form">
+      <div class="field">
+        <label>Geschlecht</label>
+        <div class="chip-group" id="filter-gender-chips"></div>
+      </div>
+      <div class="row-2">
+        <div class="field"><label>Alter von</label><input type="number" id="filter-age-min" min="18" placeholder="18"></div>
+        <div class="field"><label>Alter bis</label><input type="number" id="filter-age-max" min="18" placeholder="99"></div>
+      </div>
+      <div class="field">
+        <label>Sportarten (max. 5)</label>
+        <div class="dropdown-wrap">
+          <button type="button" class="dropdown-toggle" id="filter-sports-dropdown-toggle">Sportarten auswählen ▾</button>
+          <div class="dropdown-panel hidden" id="filter-sports-dropdown-panel"></div>
+        </div>
+        <div class="chip-group" id="filter-sports-chips" style="margin-top:8px;"></div>
+      </div>
+      <div class="field">
+        <label>Skill Level</label>
+        <div class="chip-group" id="filter-level-chips"></div>
+      </div>
+      <button class="btn-primary" id="filter-apply-btn">Filter anwenden</button>
+      <button class="btn-secondary" id="filter-reset-btn">Filter zurücksetzen</button>
     </div>
   </div>
 
@@ -189,7 +221,7 @@
 
   <!-- ===== NEUES EVENT ===== -->
   <div id="screen-newevent" class="screen hidden">
-    <div class="section-title">Neues Event</div>
+    <div class="section-title" id="newevent-title">Neues Event</div>
     <div class="form">
       <div class="field">
         <label>Sportart</label>
@@ -450,6 +482,163 @@ renderSportsDropdown();
 renderSportsChips();
 renderSkillPerSport();
 
+/* ---------------- Filter (Entdecken) ---------------- */
+const GENDERS = [{v:'männlich', label:'Männlich'}, {v:'weiblich', label:'Weiblich'}, {v:'divers', label:'Divers'}];
+let discoverFilters = {genders: [], ageMin: null, ageMax: null, sports: [], levels: []};
+
+function renderFilterGenderChips(){
+  const el = document.getElementById('filter-gender-chips');
+  el.innerHTML = GENDERS.map(g => `<div class="chip ${discoverFilters.genders.includes(g.v) ? 'selected' : ''}" data-val="${g.v}">${g.label}</div>`).join('');
+  el.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const v = chip.dataset.val;
+      if(discoverFilters.genders.includes(v)){
+        discoverFilters.genders = discoverFilters.genders.filter(x => x !== v);
+      } else {
+        discoverFilters.genders.push(v);
+      }
+      renderFilterGenderChips();
+    });
+  });
+}
+
+function renderFilterLevelChips(){
+  const el = document.getElementById('filter-level-chips');
+  el.innerHTML = LEVELS.map(l => `<div class="chip ${discoverFilters.levels.includes(l) ? 'selected' : ''}" data-val="${l}">${l}</div>`).join('');
+  el.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const v = chip.dataset.val;
+      if(discoverFilters.levels.includes(v)){
+        discoverFilters.levels = discoverFilters.levels.filter(x => x !== v);
+      } else {
+        discoverFilters.levels.push(v);
+      }
+      renderFilterLevelChips();
+    });
+  });
+}
+
+function renderFilterSportsDropdown(){
+  const panel = document.getElementById('filter-sports-dropdown-panel');
+  const atMax = discoverFilters.sports.length >= MAX_SPORTS;
+  panel.innerHTML = SPORTS.map(s => {
+    const checked = discoverFilters.sports.includes(s);
+    const disabled = !checked && atMax;
+    return `<div class="dropdown-item ${disabled ? 'disabled' : ''}" data-val="${s}">
+      <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} style="pointer-events:none;">
+      <span>${s}</span>
+    </div>`;
+  }).join('');
+  panel.querySelectorAll('.dropdown-item:not(.disabled)').forEach(item => {
+    item.addEventListener('click', () => {
+      const v = item.dataset.val;
+      if(discoverFilters.sports.includes(v)){
+        discoverFilters.sports = discoverFilters.sports.filter(x => x !== v);
+      } else if(discoverFilters.sports.length < MAX_SPORTS){
+        discoverFilters.sports.push(v);
+      }
+      renderFilterSportsDropdown();
+      renderFilterSportsChips();
+    });
+  });
+}
+function renderFilterSportsChips(){
+  const el = document.getElementById('filter-sports-chips');
+  el.innerHTML = discoverFilters.sports.map(s => `<div class="chip selected sport-chip" data-val="${s}">${s} <span class="remove-x" data-remove="${s}">✕</span></div>`).join('');
+  el.querySelectorAll('.remove-x').forEach(x => {
+    x.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const v = x.dataset.remove;
+      discoverFilters.sports = discoverFilters.sports.filter(s => s !== v);
+      renderFilterSportsDropdown();
+      renderFilterSportsChips();
+    });
+  });
+}
+document.getElementById('filter-sports-dropdown-toggle').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('filter-sports-dropdown-panel').classList.toggle('hidden');
+});
+document.addEventListener('click', (e) => {
+  const fPanel = document.getElementById('filter-sports-dropdown-panel');
+  const fToggle = document.getElementById('filter-sports-dropdown-toggle');
+  if(fPanel && !fPanel.contains(e.target) && e.target !== fToggle){
+    fPanel.classList.add('hidden');
+  }
+});
+
+function updateFilterBadge(){
+  const badge = document.getElementById('filter-count-badge');
+  const count = discoverFilters.genders.length + (discoverFilters.ageMin ? 1 : 0) + (discoverFilters.ageMax ? 1 : 0) + discoverFilters.sports.length + discoverFilters.levels.length;
+  if(count > 0){
+    badge.textContent = count;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+    badge.textContent = '';
+  }
+}
+
+function openDiscoverFilter(){
+  document.getElementById('filter-age-min').value = discoverFilters.ageMin || '';
+  document.getElementById('filter-age-max').value = discoverFilters.ageMax || '';
+  renderFilterGenderChips();
+  renderFilterLevelChips();
+  renderFilterSportsDropdown();
+  renderFilterSportsChips();
+  document.getElementById('screen-discover').classList.add('hidden');
+  document.getElementById('screen-matches').classList.add('hidden');
+  document.getElementById('screen-events').classList.add('hidden');
+  document.getElementById('screen-profile').classList.add('hidden');
+  document.getElementById('screen-chat').classList.add('hidden');
+  document.getElementById('screen-newevent').classList.add('hidden');
+  document.getElementById('screen-discover-filter').classList.remove('hidden');
+}
+
+function applyDiscoverFilter(){
+  discoverFilters.ageMin = parseInt(document.getElementById('filter-age-min').value) || null;
+  discoverFilters.ageMax = parseInt(document.getElementById('filter-age-max').value) || null;
+  document.getElementById('screen-discover-filter').classList.add('hidden');
+  updateFilterBadge();
+  showTab('discover');
+}
+
+function resetDiscoverFilter(){
+  discoverFilters = {genders: [], ageMin: null, ageMax: null, sports: [], levels: []};
+  document.getElementById('filter-age-min').value = '';
+  document.getElementById('filter-age-max').value = '';
+  renderFilterGenderChips();
+  renderFilterLevelChips();
+  renderFilterSportsDropdown();
+  renderFilterSportsChips();
+  updateFilterBadge();
+}
+
+function matchesDiscoverFilters(p){
+  const f = discoverFilters;
+  if(f.genders.length > 0){
+    if(!p.gender || !f.genders.includes(p.gender)) return false;
+  }
+  if(f.ageMin || f.ageMax){
+    if(!p.age) return false;
+    if(f.ageMin && p.age < f.ageMin) return false;
+    if(f.ageMax && p.age > f.ageMax) return false;
+  }
+  const sportsList = (p.sportarten || '').split(',').map(s => s.trim()).filter(Boolean);
+  if(f.sports.length > 0){
+    const overlap = sportsList.filter(s => f.sports.includes(s));
+    if(overlap.length === 0) return false;
+  }
+  if(f.levels.length > 0){
+    let skillMap = {};
+    try{ skillMap = JSON.parse(p.skill_level || '{}'); } catch(e){ skillMap = {}; }
+    const relevantSports = f.sports.length > 0 ? sportsList.filter(s => f.sports.includes(s)) : sportsList;
+    const hasMatch = relevantSports.some(s => f.levels.includes(skillMap[s]));
+    if(!hasMatch) return false;
+  }
+  return true;
+}
+
 /* ---------------- Auth UI ---------------- */
 function toggleAuthMode(){
   isSignupMode = !isSignupMode;
@@ -511,10 +700,13 @@ async function handleLogout(){
   document.getElementById('screen-chat').classList.add('hidden');
   document.getElementById('screen-events').classList.add('hidden');
   document.getElementById('screen-newevent').classList.add('hidden');
+  document.getElementById('screen-discover-filter').classList.add('hidden');
   document.getElementById('screen-auth').classList.remove('hidden');
   document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
   document.getElementById('events-badge').classList.add('hidden');
+  discoverFilters = {genders: [], ageMin: null, ageMax: null, sports: [], levels: []};
+  updateFilterBadge();
   stopMessagePolling();
   stopUnreadPolling();
 }
@@ -538,6 +730,7 @@ function showTab(tab){
   document.getElementById('screen-profile').classList.toggle('hidden', tab !== 'profile');
   document.getElementById('screen-chat').classList.add('hidden');
   document.getElementById('screen-newevent').classList.add('hidden');
+  document.getElementById('screen-discover-filter').classList.add('hidden');
   document.getElementById('tab-discover').classList.toggle('active', tab === 'discover');
   document.getElementById('tab-matches').classList.toggle('active', tab === 'matches');
   document.getElementById('tab-events').classList.toggle('active', tab === 'events');
@@ -548,14 +741,43 @@ function showTab(tab){
   if(tab === 'events') loadEvents();
 }
 
-function openNewEventForm(){
-  fillEventSportSelect();
+let editingEventId = null;
+
+function showNewEventScreen(){
   document.getElementById('screen-discover').classList.add('hidden');
   document.getElementById('screen-matches').classList.add('hidden');
   document.getElementById('screen-events').classList.add('hidden');
   document.getElementById('screen-profile').classList.add('hidden');
   document.getElementById('screen-chat').classList.add('hidden');
   document.getElementById('screen-newevent').classList.remove('hidden');
+}
+
+function openNewEventForm(){
+  editingEventId = null;
+  fillEventSportSelect();
+  document.getElementById('newevent-title').textContent = 'Neues Event';
+  document.getElementById('event-save-btn').textContent = 'Event erstellen';
+  document.getElementById('ev2-sport').value = '';
+  document.getElementById('ev2-title').value = '';
+  document.getElementById('ev2-ort').value = '';
+  document.getElementById('ev2-date').value = '';
+  document.getElementById('ev2-time').value = '';
+  document.getElementById('ev2-max').value = '';
+  showNewEventScreen();
+}
+
+function openEditEventForm(ev){
+  editingEventId = ev.id;
+  fillEventSportSelect();
+  document.getElementById('newevent-title').textContent = 'Event bearbeiten';
+  document.getElementById('event-save-btn').textContent = 'Änderungen speichern';
+  document.getElementById('ev2-sport').value = ev.sportart || '';
+  document.getElementById('ev2-title').value = ev.title || '';
+  document.getElementById('ev2-ort').value = ev.ort || '';
+  document.getElementById('ev2-date').value = ev.event_date || '';
+  document.getElementById('ev2-time').value = ev.event_time || '';
+  document.getElementById('ev2-max').value = ev.max_participants || '';
+  showNewEventScreen();
 }
 
 /* ---------------- Discover / Matching ---------------- */
@@ -658,6 +880,7 @@ async function loadEvents(){
         return `<div class="cancel-notice"><span>⚠️ ${name} hat die Teilnahme abgesagt.</span><span class="dismiss-x" data-id="${c.id}">✕</span></div>`;
       }).join('');
       creatorAreaHtml = `
+        <button class="btn-secondary edit-event-btn" data-id="${e.id}" style="width:100%;margin-top:8px;">✏️ Event bearbeiten</button>
         <button class="participant-toggle" data-event="${e.id}">👥 Teilnehmer anzeigen (${names.length})</button>
         <div class="participant-list hidden" id="participants-${e.id}">${names.length ? names.join(', ') : 'Noch niemand angemeldet.'}</div>
         ${noticesHtml}`;
@@ -698,6 +921,13 @@ async function loadEvents(){
   });
   list.querySelectorAll('.dismiss-x').forEach(x => {
     x.addEventListener('click', () => dismissCancellation(x.dataset.id));
+  });
+  list.querySelectorAll('.edit-event-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const e = events.find(ev => ev.id === btn.dataset.id);
+      if(!e) return;
+      openEditEventForm(e);
+    });
   });
 }
 
@@ -754,7 +984,7 @@ async function refreshEventsBadge(){
   badge.classList.remove('hidden');
 }
 
-async function createEvent(){
+async function saveEvent(){
   const sportart = document.getElementById('ev2-sport').value;
   const title = document.getElementById('ev2-title').value.trim() || 'Gemeinsames Training';
   const ort = document.getElementById('ev2-ort').value.trim();
@@ -762,10 +992,16 @@ async function createEvent(){
   const event_time = document.getElementById('ev2-time').value.trim() || '18:00';
   const max_participants = parseInt(document.getElementById('ev2-max').value) || null;
   if(!event_date){ alert('Bitte ein Datum wählen.'); return; }
-  const {data, error} = await sb.from('events').insert({creator_id: currentUser.id, title, sportart, ort, event_date, event_time, max_participants}).select().maybeSingle();
-  if(error){ showSwipeError('Fehler beim Erstellen: ' + error.message); return; }
-  if(data){
-    await sb.from('event_participants').insert({event_id: data.id, user_id: currentUser.id});
+  if(editingEventId){
+    const {error} = await sb.from('events').update({title, sportart, ort, event_date, event_time, max_participants}).eq('id', editingEventId);
+    if(error){ showSwipeError('Fehler beim Speichern: ' + error.message); return; }
+    editingEventId = null;
+  } else {
+    const {data, error} = await sb.from('events').insert({creator_id: currentUser.id, title, sportart, ort, event_date, event_time, max_participants}).select().maybeSingle();
+    if(error){ showSwipeError('Fehler beim Erstellen: ' + error.message); return; }
+    if(data){
+      await sb.from('event_participants').insert({event_id: data.id, user_id: currentUser.id});
+    }
   }
   document.getElementById('ev2-title').value = '';
   document.getElementById('ev2-ort').value = '';
@@ -786,7 +1022,7 @@ async function loadDiscoverProfiles(){
   excludeIds.add(currentUser.id);
   const {data: profiles, error} = await sb.from('profiles').select('*');
   if(error){ deck.innerHTML = '<div class="empty-deck">Fehler beim Laden: ' + error.message + '</div>'; return; }
-  discoverProfiles = (profiles || []).filter(p => !excludeIds.has(p.id) && p.username);
+  discoverProfiles = (profiles || []).filter(p => !excludeIds.has(p.id) && p.username && matchesDiscoverFilters(p));
   discoverIndex = 0;
   document.getElementById('btn-pass').disabled = false;
   document.getElementById('btn-like').disabled = false;
@@ -1156,10 +1392,13 @@ document.getElementById('tab-matches').addEventListener('click', () => showTab('
 document.getElementById('tab-events').addEventListener('click', () => showTab('events'));
 document.getElementById('tab-profile').addEventListener('click', () => showTab('profile'));
 document.getElementById('event-fab').addEventListener('click', openNewEventForm);
-document.getElementById('event-save-btn').addEventListener('click', createEvent);
-document.getElementById('event-cancel-btn').addEventListener('click', () => showTab('events'));
+document.getElementById('event-save-btn').addEventListener('click', saveEvent);
+document.getElementById('event-cancel-btn').addEventListener('click', () => { editingEventId = null; showTab('events'); });
 document.getElementById('btn-pass').addEventListener('click', () => swipe(false));
 document.getElementById('btn-like').addEventListener('click', () => swipe(true));
+document.getElementById('discover-filter-btn').addEventListener('click', openDiscoverFilter);
+document.getElementById('filter-apply-btn').addEventListener('click', applyDiscoverFilter);
+document.getElementById('filter-reset-btn').addEventListener('click', resetDiscoverFilter);
 document.getElementById('chat-back').addEventListener('click', () => { stopMessagePolling(); showTab('matches'); });
 document.getElementById('chat-send').addEventListener('click', sendChatMessage);
 document.getElementById('chat-input').addEventListener('keydown', (e) => { if(e.key === 'Enter') sendChatMessage(); });
