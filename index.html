@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 25)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 26)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -299,7 +299,9 @@
     <div class="chat-header">
       <div class="back" id="chat-back">←</div>
       <div class="avatar-circle" id="chat-avatar" style="width:38px;height:38px;font-size:16px;"></div>
-      <div class="match-name" id="chat-name"></div>
+      <div class="match-name" id="chat-name" style="flex:1;"></div>
+      <div id="chat-report-btn" title="Nutzer melden" style="cursor:pointer;font-size:18px;padding:4px;">⚠️</div>
+      <div id="chat-block-btn" title="Nutzer blockieren" style="cursor:pointer;font-size:18px;padding:4px;">🚫</div>
     </div>
     <div class="chat-body" id="chat-body" style="flex:1;overflow-y:auto;"></div>
     <div class="chat-input-bar">
@@ -323,8 +325,16 @@
         <label>Passwort</label>
         <input type="password" id="auth-password" placeholder="mind. 6 Zeichen">
       </div>
+      <div class="field hidden" id="privacy-consent-field">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;text-transform:none;letter-spacing:normal;font-size:12.5px;font-weight:400;color:var(--text);">
+          <input type="checkbox" id="auth-privacy-consent" style="width:auto;margin-top:2px;">
+          <span>Ich habe die <span id="open-privacy-link" style="color:var(--primary);text-decoration:underline;cursor:pointer;">Datenschutzhinweise</span> gelesen und akzeptiere sie.</span>
+        </label>
+      </div>
       <button class="btn-primary" id="auth-submit">Anmelden</button>
       <button class="btn-link" id="auth-toggle-btn">Noch kein Konto? Jetzt registrieren</button>
+      <button class="btn-link" id="forgot-password-btn" style="margin-top:-8px;">Passwort vergessen?</button>
+      <button class="btn-link" id="show-privacy-btn" style="margin-top:-8px;">Datenschutzhinweise</button>
     </div>
   </div>
 
@@ -419,6 +429,10 @@
           <label>Zusätzliche Angaben</label>
           <textarea id="trainer-price-note" rows="2" placeholder="z.B. 10er-Abo CHF 650, Einzellektion 75.–"></textarea>
         </div>
+      </div>
+      <div class="field" style="border-top:1px solid var(--border);padding-top:14px;margin-top:2px;">
+        <label>Blockierte Nutzer</label>
+        <div id="blocked-users-list" style="font-size:12.5px;color:var(--muted);">Lade…</div>
       </div>
       <button class="btn-primary" id="profile-save-btn">Profil speichern</button>
     </div>
@@ -872,9 +886,92 @@ function toggleAuthMode(){
   document.getElementById('auth-msg').innerHTML = '';
   document.getElementById('auth-submit').classList.toggle('signup-mode', isSignupMode);
   document.getElementById('auth-title').classList.toggle('signup-mode', isSignupMode);
+  document.getElementById('privacy-consent-field').classList.toggle('hidden', !isSignupMode);
 }
 function showMsg(containerId, text, type){
   document.getElementById(containerId).innerHTML = `<div class="msg ${type}">${text}</div>`;
+}
+
+function showPrivacyNotice(){
+  const wrap = document.querySelector('.phone');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="event-form-card" style="max-height:520px;overflow-y:auto;text-align:left;">
+      <div style="font-weight:800;font-size:16px;margin-bottom:10px;">🔒 Datenschutzhinweise</div>
+      <div style="font-size:12px;line-height:1.5;color:var(--text);">
+        <p style="margin-bottom:8px;"><strong>Welche Daten wir speichern:</strong> Benutzername, Geschlecht, Alter, ausgewählte Sportarten und Skill-Level, Ziele, Wohnort, optional deinen genauen Standort (nur wenn du ihn aktiv freigibst), sowie – falls du dich als Trainer/in registrierst – Angaben zu deinem Trainingsangebot und Preismodell. Zusätzlich speichern wir deine Chatnachrichten, Matches, Event-Anmeldungen und Swipes.</p>
+        <p style="margin-bottom:8px;"><strong>Wofür wir sie nutzen:</strong> Um dir passende Trainingspartner und Events vorzuschlagen sowie Matching, Chat und Terminorganisation zu ermöglichen.</p>
+        <p style="margin-bottom:8px;"><strong>Wer Zugriff hat:</strong> Andere registrierte Nutzer sehen dein Profil im Rahmen der App-Funktionen (z.B. beim Entdecken). Chatnachrichten sind nur für dich und deinen Match-Partner sichtbar.</p>
+        <p style="margin-bottom:8px;"><strong>Speicherort:</strong> Die Daten werden bei unserem Datenbank-Anbieter Supabase gespeichert.</p>
+        <p style="margin-bottom:8px;"><strong>Deine Rechte:</strong> Du kannst jederzeit per E-Mail Auskunft, Berichtigung oder Löschung deiner Daten verlangen.</p>
+        <p style="margin-bottom:8px;"><strong>Kontakt:</strong> <a href="mailto:mario46.scoca.ms@gmail.com">mario46.scoca.ms@gmail.com</a></p>
+        <p style="color:var(--muted);font-size:11px;">Hinweis: Dies ist eine vorläufige, einfache Fassung für die Testphase und ersetzt keine rechtliche Beratung.</p>
+      </div>
+      <button class="btn-secondary" id="privacy-close-btn" style="width:100%;margin-top:14px;">Schliessen</button>
+    </div>
+  `;
+  wrap.appendChild(overlay);
+  document.getElementById('privacy-close-btn').addEventListener('click', () => overlay.remove());
+}
+
+function showForgotPasswordForm(){
+  const wrap = document.querySelector('.phone');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="event-form-card">
+      <div style="font-weight:800;font-size:16px;margin-bottom:10px;">🔑 Passwort vergessen</div>
+      <div class="field"><label>E-Mail</label><input type="email" id="forgot-email" placeholder="du@beispiel.ch"></div>
+      <div id="forgot-msg" style="margin:8px 0;"></div>
+      <button class="btn-primary" id="forgot-submit" style="width:100%;margin-top:10px;">Link senden</button>
+      <button class="btn-secondary" id="forgot-cancel" style="width:100%;margin-top:8px;">Abbrechen</button>
+    </div>
+  `;
+  wrap.appendChild(overlay);
+  document.getElementById('forgot-cancel').addEventListener('click', () => overlay.remove());
+  document.getElementById('forgot-submit').addEventListener('click', async () => {
+    const email = document.getElementById('forgot-email').value.trim();
+    const msgEl = document.getElementById('forgot-msg');
+    if(!email){ msgEl.innerHTML = '<div class="msg error">Bitte E-Mail eingeben.</div>'; return; }
+    const btn = document.getElementById('forgot-submit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Wird gesendet…';
+    const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: window.location.origin + window.location.pathname});
+    btn.disabled = false;
+    btn.textContent = 'Link senden';
+    if(error){ msgEl.innerHTML = '<div class="msg error">Fehler: ' + error.message + '</div>'; return; }
+    msgEl.innerHTML = '<div class="msg ok">Falls diese E-Mail registriert ist, erhältst du in Kürze einen Link zum Zurücksetzen.</div>';
+  });
+}
+
+function showResetPasswordForm(){
+  const wrap = document.querySelector('.phone');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="event-form-card">
+      <div style="font-weight:800;font-size:16px;margin-bottom:10px;">🔑 Neues Passwort setzen</div>
+      <div class="field"><label>Neues Passwort</label><input type="password" id="new-password" placeholder="mind. 6 Zeichen"></div>
+      <div id="reset-msg" style="margin:8px 0;"></div>
+      <button class="btn-primary" id="reset-submit" style="width:100%;margin-top:10px;">Passwort speichern</button>
+    </div>
+  `;
+  wrap.appendChild(overlay);
+  document.getElementById('reset-submit').addEventListener('click', async () => {
+    const pw = document.getElementById('new-password').value;
+    const msgEl = document.getElementById('reset-msg');
+    if(!pw || pw.length < 6){ msgEl.innerHTML = '<div class="msg error">Mindestens 6 Zeichen.</div>'; return; }
+    const btn = document.getElementById('reset-submit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Wird gespeichert…';
+    const {error} = await sb.auth.updateUser({password: pw});
+    btn.disabled = false;
+    btn.textContent = 'Passwort speichern';
+    if(error){ msgEl.innerHTML = '<div class="msg error">Fehler: ' + error.message + '</div>'; return; }
+    msgEl.innerHTML = '<div class="msg ok">Passwort gespeichert ✓</div>';
+    setTimeout(() => overlay.remove(), 1200);
+  });
 }
 
 async function handleAuthSubmit(){
@@ -882,6 +979,10 @@ async function handleAuthSubmit(){
   const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
   if(!email || !password){ showMsg('auth-msg','Bitte E-Mail und Passwort ausfüllen.','error'); return; }
+  if(isSignupMode && !document.getElementById('auth-privacy-consent').checked){
+    showMsg('auth-msg','Bitte akzeptiere die Datenschutzhinweise, um dich zu registrieren.','error');
+    return;
+  }
   const btn = document.getElementById('auth-submit');
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Bitte warten…';
@@ -937,6 +1038,9 @@ async function handleLogout(){
   profileLat = null;
   profileLng = null;
   document.getElementById('location-status').textContent = '';
+  document.getElementById('blocked-users-list').textContent = 'Lade…';
+  document.getElementById('auth-privacy-consent').checked = false;
+  document.getElementById('privacy-consent-field').classList.add('hidden');
   stopMessagePolling();
   stopUnreadPolling();
 }
@@ -1300,6 +1404,16 @@ async function saveEvent(){
   showTab('events');
 }
 
+/* ---------------- Blockieren / Melden ---------------- */
+async function getBlockedIds(){
+  const ids = new Set();
+  const {data} = await sb.from('blocks').select('blocker_id, blocked_id').or(`blocker_id.eq.${currentUser.id},blocked_id.eq.${currentUser.id}`);
+  (data || []).forEach(b => {
+    ids.add(b.blocker_id === currentUser.id ? b.blocked_id : b.blocker_id);
+  });
+  return ids;
+}
+
 async function loadDiscoverProfiles(){
   const deck = document.getElementById('deck');
   deck.innerHTML = '<div class="empty-deck">Lade Profile…</div>';
@@ -1309,6 +1423,8 @@ async function loadDiscoverProfiles(){
   if(swErr){ deck.innerHTML = '<div class="empty-deck">Fehler beim Laden: ' + swErr.message + '</div>'; return; }
   const excludeIds = new Set((mySwipes || []).map(s => s.swiped_id));
   excludeIds.add(currentUser.id);
+  const blockedIds = await getBlockedIds();
+  blockedIds.forEach(id => excludeIds.add(id));
   const {data: profiles, error} = await sb.from('profiles').select('*');
   if(error){ deck.innerHTML = '<div class="empty-deck">Fehler beim Laden: ' + error.message + '</div>'; return; }
   discoverProfiles = (profiles || []).filter(p => !excludeIds.has(p.id) && p.username && matchesDiscoverFilters(p));
@@ -1445,8 +1561,13 @@ function stopUnreadPolling(){
 async function loadMatches(){
   const list = document.getElementById('match-list');
   list.innerHTML = '<div class="empty-state">Lade Matches…</div>';
-  const {data: matchRows, error} = await sb.from('matches').select('*').or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
+  const {data: allMatchRows, error} = await sb.from('matches').select('*').or(`user_a.eq.${currentUser.id},user_b.eq.${currentUser.id}`);
   if(error){ list.innerHTML = '<div class="empty-state">Fehler beim Laden: ' + error.message + '</div>'; return; }
+  const blockedIds = await getBlockedIds();
+  const matchRows = (allMatchRows || []).filter(m => {
+    const otherId = m.user_a === currentUser.id ? m.user_b : m.user_a;
+    return !blockedIds.has(otherId);
+  });
   if(!matchRows || matchRows.length === 0){
     list.innerHTML = '<div class="empty-state">Noch keine Matches.<br>Geh zu „Entdecken" und finde Trainingspartner!</div>';
     return;
@@ -1501,6 +1622,55 @@ async function openChat(matchId, otherProfile){
     await sb.from('messages').update({read: true}).eq('match_id', matchId).eq('read', false).neq('sender_id', currentUser.id);
     refreshMatchesBadge();
   }, 4000);
+}
+
+async function handleBlockUser(){
+  if(!activeMatch) return;
+  const name = activeMatch.other.username || 'diese Person';
+  if(!confirm('Möchtest du ' + name + ' wirklich blockieren? Ihr seht euch danach gegenseitig nicht mehr in Entdecken und Matches.')) return;
+  const {error} = await sb.from('blocks').insert({blocker_id: currentUser.id, blocked_id: activeMatch.other.id});
+  if(error){ showSwipeError('Fehler: ' + error.message); return; }
+  stopMessagePolling();
+  activeMatch = null;
+  showTab('matches');
+}
+
+function showReportForm(){
+  if(!activeMatch) return;
+  const wrap = document.querySelector('.phone');
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="event-form-card">
+      <div style="font-weight:800;font-size:16px;margin-bottom:10px;">⚠️ Nutzer melden</div>
+      <div class="field">
+        <label>Grund</label>
+        <select id="report-reason">
+          <option value="Unangemessenes Verhalten">Unangemessenes Verhalten</option>
+          <option value="Fake-Profil">Fake-Profil</option>
+          <option value="Belästigung">Belästigung</option>
+          <option value="Sonstiges">Sonstiges</option>
+        </select>
+      </div>
+      <div class="field"><label>Zusätzliche Angaben (optional)</label><textarea id="report-note" rows="2"></textarea></div>
+      <div id="report-msg" style="margin:8px 0;"></div>
+      <button class="btn-primary" id="report-submit" style="width:100%;margin-top:10px;">Meldung senden</button>
+      <button class="btn-secondary" id="report-cancel" style="width:100%;margin-top:8px;">Abbrechen</button>
+    </div>
+  `;
+  wrap.appendChild(overlay);
+  document.getElementById('report-cancel').addEventListener('click', () => overlay.remove());
+  document.getElementById('report-submit').addEventListener('click', async () => {
+    const reason = document.getElementById('report-reason').value;
+    const note = document.getElementById('report-note').value.trim();
+    const btn = document.getElementById('report-submit');
+    btn.disabled = true;
+    const {error} = await sb.from('reports').insert({reporter_id: currentUser.id, reported_id: activeMatch.other.id, match_id: activeMatch.id, reason, note});
+    btn.disabled = false;
+    if(error){ document.getElementById('report-msg').innerHTML = '<div class="msg error">Fehler: ' + error.message + '</div>'; return; }
+    document.getElementById('report-msg').innerHTML = '<div class="msg ok">Danke, deine Meldung wurde übermittelt.</div>';
+    setTimeout(() => overlay.remove(), 1200);
+  });
 }
 
 async function loadMessages(){
@@ -1623,7 +1793,31 @@ async function sendChatMessage(){
 }
 
 /* ---------------- Profil laden/speichern ---------------- */
+async function loadBlockedUsers(){
+  const el = document.getElementById('blocked-users-list');
+  if(!el) return;
+  el.textContent = 'Lade…';
+  const {data: rows, error} = await sb.from('blocks').select('id, blocked_id').eq('blocker_id', currentUser.id);
+  if(error){ el.textContent = 'Fehler beim Laden.'; return; }
+  if(!rows || rows.length === 0){ el.textContent = 'Keine blockierten Nutzer.'; return; }
+  const ids = rows.map(r => r.blocked_id);
+  const {data: profiles} = await sb.from('profiles').select('id, username').in('id', ids);
+  const nameById = {};
+  (profiles || []).forEach(p => nameById[p.id] = p.username || 'Unbekannt');
+  el.innerHTML = rows.map(r => `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+    <span>${escapeHtml(nameById[r.blocked_id] || 'Unbekannt')}</span>
+    <button class="btn-secondary unblock-btn" data-id="${r.id}" style="padding:4px 10px;font-size:11.5px;">Entsperren</button>
+  </div>`).join('');
+  el.querySelectorAll('.unblock-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await sb.from('blocks').delete().eq('id', btn.dataset.id);
+      loadBlockedUsers();
+    });
+  });
+}
+
 async function loadProfile(){
+  await loadBlockedUsers();
   const {data, error} = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
   if(error){ showMsg('profile-msg', 'Fehler beim Laden: ' + error.message, 'error'); return; }
   if(data){
@@ -1710,6 +1904,11 @@ document.getElementById('chat-back').addEventListener('click', () => { stopMessa
 document.getElementById('chat-send').addEventListener('click', sendChatMessage);
 document.getElementById('chat-input').addEventListener('keydown', (e) => { if(e.key === 'Enter') sendChatMessage(); });
 document.getElementById('chat-cal-btn').addEventListener('click', showEventForm);
+document.getElementById('forgot-password-btn').addEventListener('click', showForgotPasswordForm);
+document.getElementById('show-privacy-btn').addEventListener('click', showPrivacyNotice);
+document.getElementById('open-privacy-link').addEventListener('click', showPrivacyNotice);
+document.getElementById('chat-report-btn').addEventListener('click', showReportForm);
+document.getElementById('chat-block-btn').addEventListener('click', handleBlockUser);
 
 /* ---------------- Beim Start: Bibliothek laden, dann Session prüfen ---------------- */
 (async function init(){
@@ -1731,6 +1930,11 @@ document.getElementById('chat-cal-btn').addEventListener('click', showEventForm)
     document.getElementById('auth-submit').disabled = true;
     return;
   }
+  sb.auth.onAuthStateChange((event, session) => {
+    if(event === 'PASSWORD_RECOVERY'){
+      showResetPasswordForm();
+    }
+  });
   const {data:{session}} = await sb.auth.getSession();
   if(session){
     await afterLogin(session.user);
