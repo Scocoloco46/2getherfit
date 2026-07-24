@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 29)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 30)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -1359,12 +1359,16 @@ async function dismissCancellation(id){
 async function refreshEventsBadge(){
   if(!currentUser) return;
   const badge = document.getElementById('events-badge');
-  const {data: myEvents, error: evErr} = await sb.from('events').select('id').eq('creator_id', currentUser.id);
+  const {data: myEvents, error: evErr} = await sb.from('events').select('id, event_date, event_time').eq('creator_id', currentUser.id);
   if(evErr || !myEvents || myEvents.length === 0){
     badge.classList.add('hidden'); badge.textContent = '';
     return;
   }
-  const ids = myEvents.map(e => e.id);
+  const ids = myEvents.filter(e => !eventIsPast(e)).map(e => e.id);
+  if(ids.length === 0){
+    badge.classList.add('hidden'); badge.textContent = '';
+    return;
+  }
   const {count, error} = await sb.from('event_cancellations').select('id', {count: 'exact', head: true}).in('event_id', ids).eq('seen', false);
   if(error || !count){
     badge.classList.add('hidden'); badge.textContent = '';
