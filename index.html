@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>2getherfit – Login &amp; Profil (echte Version)</title>
+<title>Pacemates – Login &amp; Profil (echte Version)</title>
 <script>
   window.onerror = function(msg, url, line, col, error){
     var show = function(){
@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 27)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 28)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -159,7 +159,7 @@
   <div class="notch"></div>
   <div class="statusbar"></div>
   <div class="topbar">
-    <div class="logo">2gether<span>fit</span></div>
+    <div class="logo">Pace<span>mates</span></div>
     <div id="topbar-logout" class="hidden" style="font-size:13px;color:var(--muted);cursor:pointer;">Abmelden</div>
   </div>
 
@@ -314,7 +314,7 @@
   <!-- ===== AUTH SCREEN (Login / Registrieren) ===== -->
   <div id="screen-auth" class="screen">
     <div class="section-title" id="auth-title">🔑 Anmelden</div>
-    <div class="sub" id="auth-sub">Melde dich an, um dein 2getherfit-Profil zu sehen.</div>
+    <div class="sub" id="auth-sub">Melde dich an, um dein Pacemates-Profil zu sehen.</div>
     <div id="auth-msg"></div>
     <div class="form">
       <div class="field">
@@ -880,8 +880,8 @@ function toggleAuthMode(){
   isSignupMode = !isSignupMode;
   document.getElementById('auth-title').textContent = isSignupMode ? '✍️ Registrieren' : '🔑 Anmelden';
   document.getElementById('auth-sub').textContent = isSignupMode
-    ? 'Erstelle ein neues 2getherfit-Konto.'
-    : 'Melde dich an, um dein 2getherfit-Profil zu sehen.';
+    ? 'Erstelle ein neues Pacemates-Konto.'
+    : 'Melde dich an, um dein Pacemates-Profil zu sehen.';
   document.getElementById('auth-submit').textContent = isSignupMode ? 'Registrieren' : 'Anmelden';
   document.getElementById('auth-toggle-btn').textContent = isSignupMode
     ? 'Schon ein Konto? Jetzt anmelden'
@@ -1444,7 +1444,7 @@ function renderDeck(){
   const deck = document.getElementById('deck');
   deck.innerHTML = '';
   if(discoverIndex >= discoverProfiles.length){
-    deck.innerHTML = '<div class="empty-deck">🎉 Keine weiteren Profile gerade.<br>Schau später wieder vorbei, oder lade jemanden ein, sich bei 2getherfit anzumelden!</div>';
+    deck.innerHTML = '<div class="empty-deck">🎉 Keine weiteren Profile gerade.<br>Schau später wieder vorbei, oder lade jemanden ein, sich bei Pacemates anzumelden!</div>';
     return;
   }
   const p = discoverProfiles[discoverIndex];
@@ -1762,9 +1762,9 @@ function downloadICS(ev){
   const ics = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//2getherfit//DE',
+    'PRODID:-//Pacemates//DE',
     'BEGIN:VEVENT',
-    'UID:' + Date.now() + '-' + Math.random().toString(36).slice(2) + '@2getherfit',
+    'UID:' + Date.now() + '-' + Math.random().toString(36).slice(2) + '@pacemates',
     'DTSTAMP:' + formatICSDate(new Date()),
     'DTSTART:' + formatICSDate(start),
     'DTEND:' + formatICSDate(end),
