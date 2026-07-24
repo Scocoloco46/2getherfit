@@ -151,7 +151,7 @@
 </head>
 <body>
 <div class="wrap" style="display:flex;flex-direction:column;align-items:center;">
-<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 28)</b></div>
+<div class="page-note">📱 Echte Version mit Supabase-Datenbank – Konten und Profile werden wirklich gespeichert. <b>(Version 29)</b></div>
 <div class="setup-warning" id="setup-warning">
   ⚠️ Bitte zuerst <code>SUPABASE_URL</code> und <code>SUPABASE_ANON_KEY</code> im Code (ganz unten im &lt;script&gt;) mit deinen eigenen Werten aus deinem Supabase-Projekt ersetzen, sonst funktioniert nichts.
 </div>
@@ -1028,7 +1028,7 @@ async function handleLogout(){
   document.getElementById('auth-email').value = '';
   document.getElementById('auth-password').value = '';
   document.getElementById('events-badge').classList.add('hidden');
-  discoverFilters = {genders: [], ageMin: null, ageMax: null, sports: [], levels: []};
+  discoverFilters = {roles: [], genders: [], ageMin: null, ageMax: null, sports: [], levels: [], wohnort: '', radiusKm: null};
   updateFilterBadge();
   document.getElementById('p-is-trainer').checked = false;
   document.getElementById('trainer-fields').classList.add('hidden');
